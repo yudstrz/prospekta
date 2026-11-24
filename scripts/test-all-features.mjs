@@ -1,4 +1,4 @@
-const BASE_URL = 'http://localhost:3000/customer-reach';
+const BASE_URL = 'http://localhost:3000';
 
 async function runTestSuite() {
   console.log('====================================================');

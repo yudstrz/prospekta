@@ -1,6 +1,5 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  basePath: '/customer-reach',
   experimental: {
     agentUpgrade: 'security',
   },
@@ -10,12 +9,6 @@ const nextConfig = {
   poweredByHeader: false,
   async redirects() {
     return [
-      {
-        source: '/',
-        destination: '/customer-reach',
-        basePath: false,
-        permanent: false,
-      },
       {
         source: '/calendly',
         destination: 'https://calendar.google.com',
