@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic';
 export async function GET(request) {
   const host = request.headers.get('x-forwarded-host') || request.headers.get('host') || 'localhost:3000';
   const proto = request.headers.get('x-forwarded-proto') || 'https';
-  const baseUrl = `${proto}://${host}/customer-reach`;
+  const baseUrl = `${proto}://${host}`;
 
   const { searchParams } = new URL(request.url);
   const scope = searchParams.get('scope') === 'admin' ? 'admin' : 'user';

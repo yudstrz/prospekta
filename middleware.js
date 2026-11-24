@@ -45,6 +45,7 @@ export async function middleware(request) {
   // 1. Whitelist: Halaman Publik untuk Prospek, Otentikasi, Tracking, MCP RPC, Webhook Telegram, dan Cron Worker
   if (
     pathname.startsWith('/api/auth/') ||
+    pathname.startsWith('/api/geo/') ||
     pathname.startsWith('/api/mcp/admin') ||
     pathname.startsWith('/api/mcp/user') ||
     pathname.startsWith('/api/mcp/action') ||

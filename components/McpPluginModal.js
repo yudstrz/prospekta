@@ -34,10 +34,10 @@ export default function McpPluginModal({ onClose, currentSession }) {
 
   const role = currentSession?.role || 'user';
   const isAdmin = role === 'admin';
-  const endpointPath = isAdmin ? '/customer-reach/api/mcp/admin' : '/customer-reach/api/mcp/user';
+  const endpointPath = isAdmin ? '/api/mcp/admin' : '/api/mcp/user';
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://prospekta.id';
   const fullMcpUrl = `${origin}${endpointPath}`;
-  const openApiUrl = `${origin}/customer-reach/api/mcp/openapi.json?scope=${role}`;
+  const openApiUrl = `${origin}/api/mcp/openapi.json?scope=${role}`;
 
   useEffect(() => {
     fetchTokens();

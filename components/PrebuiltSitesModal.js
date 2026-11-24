@@ -372,7 +372,7 @@ export default function PrebuiltSitesModal({ onClose, onOpenPlace = null, initia
 
                               <button
                                 type="button"
-                                onClick={() => handleCopy(`site_${site.id}`, typeof window !== 'undefined' ? `${window.location.origin}/customer-reach/p/${site.slug}` : site.url)}
+                                onClick={() => handleCopy(`site_${site.id}`, typeof window !== 'undefined' ? `${window.location.origin}/p/${site.slug}` : site.url)}
                                 style={{
                                   background: 'none',
                                   border: 'none',
@@ -517,7 +517,7 @@ export default function PrebuiltSitesModal({ onClose, onOpenPlace = null, initia
 
                           <button
                             type="button"
-                            onClick={() => handleCopy(`m_site_${site.id}`, typeof window !== 'undefined' ? `${window.location.origin}/customer-reach/p/${site.slug}` : site.url)}
+                            onClick={() => handleCopy(`m_site_${site.id}`, typeof window !== 'undefined' ? `${window.location.origin}/p/${site.slug}` : site.url)}
                             className="btn btn-secondary btn-sm"
                             style={{ fontSize: '0.6875rem', padding: '3px 8px', minHeight: '32px', flexShrink: 0 }}
                           >

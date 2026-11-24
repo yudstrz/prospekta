@@ -49,6 +49,15 @@ const extractDirectCoords = (str) => {
   return null;
 };
 
+const getApiUrl = (endpoint) => {
+  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/customer-reach')) {
+    if (!endpoint.startsWith('/customer-reach')) {
+      return `/customer-reach${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
+    }
+  }
+  return endpoint;
+};
+
 export default function LocationPicker({
   value = '',
   onChange,
@@ -64,6 +73,9 @@ export default function LocationPicker({
 }) {
   const [showMap, setShowMap] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
+  const [isOpen, setIsOpen] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
   const [isSearching, setIsSearching] = useState(false);
   const [isResolvingLink, setIsResolvingLink] = useState(false);
   const [linkDetectedMsg, setLinkDetectedMsg] = useState(null);
@@ -79,7 +91,7 @@ export default function LocationPicker({
   useEffect(() => {
     const handleClickOutside = (e) => {
       if (wrapperRef.current && !wrapperRef.current.contains(e.target)) {
-        setSuggestions([]);
+        setIsOpen(false);
       }
     };
     document.addEventListener('mousedown', handleClickOutside);
@@ -94,10 +106,14 @@ export default function LocationPicker({
 
     if (!val || val.trim().length === 0) {
       setSuggestions([]);
+      setIsOpen(false);
+      setHasSearched(false);
+      setSearchQuery('');
       return;
     }
 
     const trimmed = val.trim();
+    setSearchQuery(trimmed);
 
     // 1. Check for immediate direct coordinates or Google Maps link
     const directCoords = extractDirectCoords(trimmed);
@@ -105,6 +121,7 @@ export default function LocationPicker({
       if (onCoordsChange) onCoordsChange(directCoords);
       setLinkDetectedMsg(`Koordinat terdeteksi (${directCoords.lat.toFixed(4)}, ${directCoords.lng.toFixed(4)})`);
       setSuggestions([]);
+      setIsOpen(false);
       // Auto reverse-geocode to replace ugly URL with real address if it was a URL
       if (trimmed.startsWith('http')) {
         reverseGeocode(directCoords.lat, directCoords.lng);
@@ -115,8 +132,9 @@ export default function LocationPicker({
     // 2. Check for shortened Google Maps link (maps.app.goo.gl or goo.gl)
     if (trimmed.startsWith('http') && (trimmed.includes('goo.gl') || trimmed.includes('maps.app.goo.gl'))) {
       setIsResolvingLink(true);
+      setIsOpen(false);
       try {
-        const res = await fetch(`/api/geo/resolve-link?url=${encodeURIComponent(trimmed)}`);
+        const res = await fetch(getApiUrl(`/api/geo/resolve-link?url=${encodeURIComponent(trimmed)}`));
         const data = await res.json();
         if (data.success && data.lat && data.lng) {
           if (onCoordsChange) onCoordsChange({ lat: data.lat, lng: data.lng });
@@ -134,35 +152,47 @@ export default function LocationPicker({
     }
 
     // 3. Autocomplete search via Nominatim (OpenStreetMap)
-    if (trimmed.length >= 3 && !trimmed.startsWith('http')) {
+    if (trimmed.length >= 2 && !trimmed.startsWith('http')) {
+      setIsOpen(true);
+      setIsSearching(true);
+      setHasSearched(false);
+
       searchTimerRef.current = setTimeout(async () => {
-        setIsSearching(true);
         try {
-          const res = await fetch(`/api/geo/search?q=${encodeURIComponent(trimmed)}`);
+          const res = await fetch(getApiUrl(`/api/geo/search?q=${encodeURIComponent(trimmed)}`));
           const data = await res.json();
           if (data.success && Array.isArray(data.results)) {
             setSuggestions(data.results);
+          } else {
+            setSuggestions([]);
           }
         } catch (_) {
-          // Ignore network glitch
+          setSuggestions([]);
         } finally {
           setIsSearching(false);
+          setHasSearched(true);
         }
-      }, 350);
+      }, 300);
     } else {
       setSuggestions([]);
+      setIsOpen(false);
+      setIsSearching(false);
+      setHasSearched(false);
     }
   };
 
   const handleSelectSuggestion = (item) => {
+    const selectedAddress = item.displayName || item.address || item.name;
     if (onChange) {
-      onChange(item.displayName || item.address || item.name);
+      onChange(selectedAddress);
     }
     if (onCoordsChange && item.lat && item.lng) {
       onCoordsChange({ lat: item.lat, lng: item.lng });
     }
     setSuggestions([]);
-    setLinkDetectedMsg(`Lokasi dipilih: ${item.name || item.city}`);
+    setIsOpen(false);
+    setHasSearched(false);
+    setLinkDetectedMsg(`Lokasi dipilih: ${item.name || item.city || 'Titik Lokasi'}`);
   };
 
   const handleMapSelect = async ({ lat, lng }) => {
@@ -175,7 +205,7 @@ export default function LocationPicker({
 
   const reverseGeocode = async (lat, lng) => {
     try {
-      const res = await fetch(`/api/geo/reverse?lat=${lat}&lng=${lng}`);
+      const res = await fetch(getApiUrl(`/api/geo/reverse?lat=${lat}&lng=${lng}`));
       const data = await res.json();
       if (data.success && data.place?.address && onChange) {
         onChange(data.place.address);
@@ -236,6 +266,16 @@ export default function LocationPicker({
           value={value}
           disabled={disabled}
           onChange={(e) => handleInputChange(e.target.value)}
+          onFocus={() => {
+            if (searchQuery.length >= 2 && (suggestions.length > 0 || hasSearched)) {
+              setIsOpen(true);
+            }
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'Escape') {
+              setIsOpen(false);
+            }
+          }}
           placeholder={placeholder}
           required={required}
           style={{
@@ -262,7 +302,7 @@ export default function LocationPicker({
         )}
 
         {/* Autocomplete Suggestions Dropdown */}
-        {suggestions.length > 0 && (
+        {isOpen && searchQuery.length >= 2 && !searchQuery.startsWith('http') && (
           <div
             style={{
               position: 'absolute',
@@ -274,54 +314,100 @@ export default function LocationPicker({
               backgroundColor: isDark ? '#0f172a' : '#ffffff',
               border: isDark ? '1px solid #334155' : '1px solid #cbd5e1',
               borderRadius: '8px',
-              boxShadow: '0 8px 24px rgba(0,0,0,0.3)',
-              maxHeight: '220px',
+              boxShadow: isDark ? '0 10px 25px -5px rgba(0,0,0,0.6)' : '0 10px 25px -5px rgba(0,0,0,0.15)',
+              maxHeight: '260px',
               overflowY: 'auto',
             }}
           >
-            {suggestions.map((item, idx) => (
+            {isSearching && (
               <div
-                key={item.id || idx}
-                onClick={() => handleSelectSuggestion(item)}
                 style={{
-                  padding: '9px 12px',
-                  borderBottom: idx < suggestions.length - 1 ? (isDark ? '1px solid #1e293b' : '1px solid #f1f5f9') : 'none',
-                  cursor: 'pointer',
+                  padding: '12px 14px',
                   display: 'flex',
-                  alignItems: 'flex-start',
+                  alignItems: 'center',
                   gap: '8px',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.backgroundColor = isDark ? '#1e293b' : '#f8fafc';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.backgroundColor = 'transparent';
+                  color: isDark ? '#94a3b8' : '#64748b',
+                  fontSize: '12px',
                 }}
               >
-                <div style={{ color: '#0284c7', marginTop: '2px' }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
-                    <circle cx="12" cy="10" r="3" />
-                  </svg>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0284c7" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ animation: 'spin 1s linear infinite' }}>
+                  <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+                </svg>
+                <span>Mencari lokasi <strong>"{searchQuery}"</strong>...</span>
+              </div>
+            )}
+
+            {!isSearching && suggestions.length > 0 && (
+              <>
+                <div
+                  style={{
+                    padding: '6px 12px 4px',
+                    fontSize: '10px',
+                    fontWeight: 700,
+                    letterSpacing: '0.6px',
+                    textTransform: 'uppercase',
+                    color: isDark ? '#64748b' : '#94a3b8',
+                    borderBottom: isDark ? '1px solid #1e293b' : '1px solid #f1f5f9',
+                  }}
+                >
+                  Pilih Hasil Pencarian ({suggestions.length})
                 </div>
-                <div style={{ flex: 1, minWidth: 0 }}>
-                  <div style={{ fontSize: '13px', fontWeight: 600, color: isDark ? '#ffffff' : '#0f172a' }}>
-                    {item.name}
-                  </div>
+                {suggestions.map((item, idx) => (
                   <div
+                    key={item.id || idx}
+                    onClick={() => handleSelectSuggestion(item)}
                     style={{
-                      fontSize: '11px',
-                      color: isDark ? '#94a3b8' : '#64748b',
-                      whiteSpace: 'nowrap',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
+                      padding: '9px 12px',
+                      borderBottom: idx < suggestions.length - 1 ? (isDark ? '1px solid #1e293b' : '1px solid #f1f5f9') : 'none',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'flex-start',
+                      gap: '8px',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.backgroundColor = isDark ? '#1e293b' : '#f8fafc';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.backgroundColor = 'transparent';
                     }}
                   >
-                    {item.address}
+                    <div style={{ color: '#0284c7', marginTop: '2px', flexShrink: 0 }}>
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                        <path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z" />
+                        <circle cx="12" cy="10" r="3" />
+                      </svg>
+                    </div>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: '13px', fontWeight: 600, color: isDark ? '#ffffff' : '#0f172a' }}>
+                        {item.name}
+                      </div>
+                      <div
+                        style={{
+                          fontSize: '11px',
+                          color: isDark ? '#94a3b8' : '#64748b',
+                          whiteSpace: 'nowrap',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                        }}
+                      >
+                        {item.address}
+                      </div>
+                    </div>
                   </div>
+                ))}
+              </>
+            )}
+
+            {!isSearching && hasSearched && suggestions.length === 0 && (
+              <div style={{ padding: '14px 12px', textAlign: 'center' }}>
+                <div style={{ fontSize: '12.5px', fontWeight: 600, color: isDark ? '#f1f5f9' : '#1e293b', marginBottom: '4px' }}>
+                  Lokasi tidak ditemukan
+                </div>
+                <div style={{ fontSize: '11px', color: isDark ? '#94a3b8' : '#64748b', lineHeight: 1.4 }}>
+                  Tidak ada hasil untuk "{searchQuery}". Periksa ejaan atau klik <strong>Pilih di Peta</strong> untuk menentukan titik langsung.
                 </div>
               </div>
-            ))}
+            )}
           </div>
         )}
       </div>

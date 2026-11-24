@@ -70,15 +70,28 @@ export default function LoginPage() {
     setError('');
 
     try {
-      const res = await fetch('/api/auth/login', {
+      const authEndpoint = typeof window !== 'undefined' && window.location.pathname.startsWith('/customer-reach')
+        ? '/customer-reach/api/auth/login'
+        : '/api/auth/login';
+
+      const res = await fetch(authEndpoint, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, rememberMe }),
       });
 
-      const data = await res.json();
+      let data = {};
+      try {
+        data = await res.json();
+      } catch (_) {
+        throw new Error(res.status === 404 ? 'Layanan otentikasi tidak ditemukan.' : 'Gagal memproses respon server.');
+      }
+
       if (data.needsVerification) {
-        await fetch('/api/auth/resend', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) }).catch(() => {});
+        const resendEndpoint = typeof window !== 'undefined' && window.location.pathname.startsWith('/customer-reach')
+          ? '/customer-reach/api/auth/resend'
+          : '/api/auth/resend';
+        await fetch(resendEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) }).catch(() => {});
         setLoading(false);
         setMode('verify');
         return;
@@ -102,8 +115,13 @@ export default function LoginPage() {
       }
       router.push(target);
       router.refresh();
-    } catch (_) {
-      setError(t('login_err_network'));
+    } catch (err) {
+      const msg = err?.message || '';
+      if (msg.includes('Failed to fetch') || msg.includes('NetworkError') || !navigator.onLine) {
+        setError(t('login_err_network'));
+      } else {
+        setError(msg || t('login_err_network'));
+      }
       triggerShake();
       setLoading(false);
     }

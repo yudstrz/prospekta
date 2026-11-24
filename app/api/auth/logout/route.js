@@ -10,7 +10,7 @@ export async function POST() {
 }
 
 export async function GET(request) {
-  const response = NextResponse.redirect(new URL('/customer-reach/login', request.url));
+  const response = NextResponse.redirect(new URL('/login', request.url));
   response.cookies.delete(AUTH_COOKIE_NAME);
   return response;
 }

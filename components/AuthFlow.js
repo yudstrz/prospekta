@@ -49,7 +49,10 @@ export default function AuthFlow({ mode, setMode, email, setEmail, isDark, onDon
     setBusy(true);
     setError('');
     try {
-      const res = await fetch(`/api/auth/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const endpoint = typeof window !== 'undefined' && window.location.pathname.startsWith('/customer-reach')
+        ? `/customer-reach/api/auth/${action}`
+        : `/api/auth/${action}`;
+      const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) throw new Error(data.error || tx('Request failed.', 'Permintaan gagal.'));
       return data;
@@ -67,11 +70,8 @@ export default function AuthFlow({ mode, setMode, email, setEmail, isDark, onDon
       if (await post('signup', { ...form, email })) setMode('verify');
     } else if (mode === 'verify') {
       if (await post('verify', { email, code: form.code })) {
-        const from = new URLSearchParams(window.location.search).get('from') || '/customer-reach';
-        let target = from.startsWith('/') && !from.startsWith('//') ? from : '/customer-reach';
-        if (!target.startsWith('/customer-reach')) {
-          target = '/customer-reach' + (target === '/' ? '' : target);
-        }
+        const from = new URLSearchParams(window.location.search).get('from') || '/';
+        const target = from.startsWith('/') && !from.startsWith('//') ? from : '/';
         window.location.assign(target);
       }
     } else if (mode === 'forgot') {

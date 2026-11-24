@@ -107,23 +107,6 @@ export default function RootLayout({ children }) {
     <html lang="id" suppressHydrationWarning>
       <head>
         <script
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                if (typeof window !== 'undefined') {
-                  var origFetch = window.fetch;
-                  window.fetch = function(url, options) {
-                    if (typeof url === 'string' && url.startsWith('/api/')) {
-                      url = '/customer-reach' + url;
-                    }
-                    return origFetch.call(this, url, options);
-                  };
-                }
-              })();
-            `,
-          }}
-        />
-        <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLdData) }}
         />

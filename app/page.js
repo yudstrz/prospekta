@@ -474,7 +474,7 @@ export default function DashboardPage() {
     try {
       const res = await fetch('/api/anchors');
       if (res.status === 401) {
-        window.location.href = '/customer-reach/login';
+        window.location.href = '/login';
         return;
       }
       const data = await res.json();
@@ -529,7 +529,7 @@ export default function DashboardPage() {
     fetch('/api/auth/me')
       .then((r) => {
         if (r.status === 401) {
-          window.location.href = '/customer-reach/login';
+          window.location.href = '/login';
           return null;
         }
         return r.json();
@@ -3454,7 +3454,7 @@ export default function DashboardPage() {
           onClose={() => setActiveModal(null)}
           onConfirm={async () => {
             await fetch('/api/auth/logout', { method: 'POST' });
-            window.location.href = '/customer-reach/login';
+            window.location.href = '/login';
           }}
         />
       )}
