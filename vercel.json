@@ -1,0 +1,8 @@
+{
+  "crons": [
+    {
+      "path": "/api/cron/auto-outreach?limit=1&daily_max=100&anchor=singapore&paced=1",
+      "schedule": "0 1 * * 1-5"
+    }
+  ]
+}

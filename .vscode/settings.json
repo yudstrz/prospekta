@@ -1,0 +1,5 @@
+{
+  "css.lint.unknownVendorSpecificProperties": "ignore",
+  "vscode-edge-devtools.webhint": false
+}
+

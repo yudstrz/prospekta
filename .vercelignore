@@ -1,0 +1,22 @@
+# Vercel Deployment Exclusions (Saves build container storage)
+docs/
+scripts/
+scratch/
+screenshots/
+anti-slop/
+.github/
+*.pdf
+2026*.*
+IMPLEMENTATION.md
+cold-email-implementation.md
+AGENTS.md
+README.md
+*.db
+*.sqlite
+*.geojson
+*.state
+*.log
+*.bak
+.gitattributes
+.hintrc
+.markdownlint.json

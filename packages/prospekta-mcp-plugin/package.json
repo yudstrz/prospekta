@@ -1,0 +1,19 @@
+{
+  "name": "prospekta-mcp-plugin",
+  "version": "1.0.0",
+  "description": "Universal MCP Plugin untuk menghubungkan Prospekta ke Gemini, ChatGPT, Claude, dan Cursor",
+  "type": "module",
+  "bin": {
+    "prospekta-mcp": "./bin/prospekta-mcp.js"
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "prospekta",
+    "gemini",
+    "claude",
+    "chatgpt"
+  ],
+  "author": "Prospekta Team",
+  "license": "MIT"
+}
