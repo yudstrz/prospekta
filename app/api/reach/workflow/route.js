@@ -59,7 +59,7 @@ export async function POST(request) {
     const requestBaseUrl = host ? `${proto}://${host}` : null;
     const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL && !process.env.NEXT_PUBLIC_BASE_URL.includes('localhost'))
       ? process.env.NEXT_PUBLIC_BASE_URL.replace(/\/+$/, '')
-      : (requestBaseUrl || 'https://prospekta.vercel.app');
+      : (requestBaseUrl || 'https://prospektas.vercel.app');
 
     // 2. Cek Riwayat Pengiriman Email (Deduplikasi Outreach)
     const targetEmail = (verifiedEmail || place.email || '').trim().toLowerCase();

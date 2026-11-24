@@ -14,7 +14,7 @@ export async function GET(request) {
     const { searchParams } = new URL(request.url);
     const placeId = searchParams.get('placeId');
 
-    const rawBaseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://prospekta.vercel.app';
+    const rawBaseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://prospektas.vercel.app';
     const baseUrl = rawBaseUrl.replace(/^['"]+|['"]+$/g, '').replace(/\/+$/, '');
 
     const session = await sessionFromRequest(request);
@@ -165,7 +165,7 @@ export async function POST(request) {
     const requestBaseUrl = host ? `${proto}://${host}` : null;
     const baseUrl = (process.env.NEXT_PUBLIC_BASE_URL && !process.env.NEXT_PUBLIC_BASE_URL.includes('localhost'))
       ? process.env.NEXT_PUBLIC_BASE_URL.replace(/\/+$/, '')
-      : (requestBaseUrl || 'https://prospekta.vercel.app');
+      : (requestBaseUrl || 'https://prospektas.vercel.app');
 
     // 1. Ambil data bisnis riil dari database
     const placeRes = await dbWrite.execute({

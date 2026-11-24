@@ -35,7 +35,7 @@ export async function POST(request) {
     const isMasterPassword = (adminPw && safeEqual(password, adminPw)) || (webmailPw && safeEqual(password, webmailPw));
 
     if (isAdminTarget && isMasterPassword) {
-      await ensureTenantSchema();
+      ensureTenantSchema().catch((err) => console.error('Background schema init error:', err));
       const token = await signSession({ uid: 'usr_admin', tid: 'tnt_master', role: 'admin', email: adminEmail, name: 'Prospekta Admin' });
       return applySessionCookie(NextResponse.json({ success: true, role: 'admin' }), token, remember);
     }

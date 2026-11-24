@@ -24,6 +24,7 @@ export async function GET(request) {
     const isInternalReferer =
       referer.includes('localhost') ||
       
+      referer.includes('prospektas.vercel.app') ||
       referer.includes('prospekta.vercel.app') || referer.includes('prospekta.id');
 
     const isInternalStaff = hasInternalAuthCookie || (referer && isInternalReferer && !isClick);
@@ -58,18 +59,18 @@ export async function GET(request) {
     // If click tracking redirect: Validate redirectUrl against Open Redirect (OWASP A01)
     if (isClick && redirectUrl) {
       try {
-        const parsed = new URL(redirectUrl, 'https://prospekta.vercel.app');
+        const parsed = new URL(redirectUrl, 'https://prospektas.vercel.app');
         const allowedHosts = [
+          'prospektas.vercel.app',
           'prospekta.vercel.app',
           'prospekta.id',
-          
           'localhost',
         ];
         if (allowedHosts.includes(parsed.hostname) || parsed.hostname.endsWith('.prospekta.id')) {
           return Response.redirect(parsed.toString(), 302);
         }
       } catch (_) {}
-      return Response.redirect('https://prospekta.vercel.app', 302);
+      return Response.redirect('https://prospektas.vercel.app', 302);
     }
 
     // Otherwise return 1x1 transparent pixel

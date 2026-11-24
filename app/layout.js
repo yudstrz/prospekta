@@ -1,7 +1,7 @@
 import './globals.css';
 import { LanguageProvider } from '@/lib/i18n';
 
-const rawBase = process.env.NEXT_PUBLIC_BASE_URL || 'https://prospekta.vercel.app';
+const rawBase = process.env.NEXT_PUBLIC_BASE_URL || 'https://prospektas.vercel.app';
 const baseUrl = rawBase.replace(/\/+$/, '');
 
 export const metadata = {
