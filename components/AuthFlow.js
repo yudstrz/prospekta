@@ -49,10 +49,7 @@ export default function AuthFlow({ mode, setMode, email, setEmail, isDark, onDon
     setBusy(true);
     setError('');
     try {
-      const endpoint = typeof window !== 'undefined' && window.location.pathname.startsWith('/customer-reach')
-        ? `/customer-reach/api/auth/${action}`
-        : `/api/auth/${action}`;
-      const res = await fetch(endpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const res = await fetch(`/api/auth/${action}`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
       const data = await res.json().catch(() => ({}));
       if (!res.ok || !data.success) throw new Error(data.error || tx('Request failed.', 'Permintaan gagal.'));
       return data;

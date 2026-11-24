@@ -10,6 +10,16 @@ const nextConfig = {
   async redirects() {
     return [
       {
+        source: '/customer-reach/:path*',
+        destination: '/:path*',
+        permanent: false,
+      },
+      {
+        source: '/customer-reach',
+        destination: '/',
+        permanent: false,
+      },
+      {
         source: '/calendly',
         destination: 'https://calendar.google.com',
         permanent: false,

@@ -42,6 +42,14 @@ function isClientAllowed(pathname, method) {
 export async function middleware(request) {
   const { pathname } = request.nextUrl;
 
+  // 0. Otomatis alihkan URL legacy /customer-reach ke URL bersih tanpa prefix
+  if (pathname.startsWith('/customer-reach')) {
+    const cleanPath = pathname.replace(/^\/customer-reach/, '') || '/';
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = cleanPath;
+    return NextResponse.redirect(redirectUrl);
+  }
+
   // 1. Whitelist: Halaman Publik untuk Prospek, Otentikasi, Tracking, MCP RPC, Webhook Telegram, dan Cron Worker
   if (
     pathname.startsWith('/api/auth/') ||

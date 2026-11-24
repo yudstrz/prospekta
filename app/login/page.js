@@ -70,11 +70,7 @@ export default function LoginPage() {
     setError('');
 
     try {
-      const authEndpoint = typeof window !== 'undefined' && window.location.pathname.startsWith('/customer-reach')
-        ? '/customer-reach/api/auth/login'
-        : '/api/auth/login';
-
-      const res = await fetch(authEndpoint, {
+      const res = await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, password, rememberMe }),
@@ -88,10 +84,7 @@ export default function LoginPage() {
       }
 
       if (data.needsVerification) {
-        const resendEndpoint = typeof window !== 'undefined' && window.location.pathname.startsWith('/customer-reach')
-          ? '/customer-reach/api/auth/resend'
-          : '/api/auth/resend';
-        await fetch(resendEndpoint, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) }).catch(() => {});
+        await fetch('/api/auth/resend', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email }) }).catch(() => {});
         setLoading(false);
         setMode('verify');
         return;

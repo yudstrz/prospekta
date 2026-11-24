@@ -49,14 +49,7 @@ const extractDirectCoords = (str) => {
   return null;
 };
 
-const getApiUrl = (endpoint) => {
-  if (typeof window !== 'undefined' && window.location.pathname.startsWith('/customer-reach')) {
-    if (!endpoint.startsWith('/customer-reach')) {
-      return `/customer-reach${endpoint.startsWith('/') ? '' : '/'}${endpoint}`;
-    }
-  }
-  return endpoint;
-};
+const getApiUrl = (endpoint) => endpoint;
 
 export default function LocationPicker({
   value = '',
