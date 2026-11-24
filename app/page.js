@@ -1339,21 +1339,14 @@ export default function DashboardPage() {
       </section>
 
       {/* Control Panel: Anchors, Radius & Map Toggle */}
-      <section className="prospekta-control-bar">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flex: 1, minWidth: 'min(100%, 300px)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-main)', display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
-              <IconMapPin />
-              <span>{tx('Office Location & Scan Area:', 'Lokasi Kantor & Area Pindai:')}</span>
-            </span>
-            {activeAnchor && (
-              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                {activeAnchor.address} ({Number(activeAnchor.lat).toFixed(4)}, {Number(activeAnchor.lng).toFixed(4)})
-              </span>
-            )}
+      <section className="prospekta-control-bar" style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'center', justifyContent: 'space-between', gap: '0.875rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexWrap: 'wrap', flex: 1, minWidth: 'min(100%, 320px)' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-main)', flexShrink: 0 }}>
+            <IconMapPin />
+            <span>{tx('Office Location:', 'Lokasi Kantor:')}</span>
           </div>
 
-          <div className="prospekta-anchor-scroll" role="tablist">
+          <div className="prospekta-anchor-scroll" role="tablist" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
             {officeAnchors.map((a) => (
               <button
                 key={a.id}
@@ -1366,7 +1359,7 @@ export default function DashboardPage() {
                   setRadiusKm(Number(a.radius_default_km) || 2);
                   setPage(1);
                 }}
-                style={{ minHeight: '38px', padding: '0 12px', fontSize: '0.8125rem' }}
+                style={{ minHeight: '36px', padding: '0 12px', fontSize: '0.8125rem' }}
               >
                 {a.name} ({a.city})
               </button>
@@ -1383,7 +1376,7 @@ export default function DashboardPage() {
                   setRadiusKm(Number(a.radius_default_km) || 2);
                   setPage(1);
                 }}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem', minHeight: '38px', padding: '0 10px', fontSize: '0.8125rem' }}
+                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem', minHeight: '36px', padding: '0 10px', fontSize: '0.8125rem' }}
               >
                 <span>{a.name} ({a.city})</span>
                 <span
@@ -1414,7 +1407,7 @@ export default function DashboardPage() {
               className="btn btn-secondary btn-sm"
               onClick={handleTogglePickingMode}
               style={{
-                minHeight: '38px',
+                minHeight: '36px',
                 padding: '0 12px',
                 fontSize: '0.8125rem',
                 borderStyle: 'dashed',
@@ -1434,10 +1427,10 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem', flexShrink: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexShrink: 0, flexWrap: 'wrap' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
             <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-main)' }}>
-              {tx('Radius & Map:', 'Radius & Peta:')}
+              {tx('Radius:', 'Radius:')}
             </span>
             {maxScrapedRadius <= 2 && (
               <span
@@ -1451,44 +1444,42 @@ export default function DashboardPage() {
                   padding: '0.0625rem 0.4375rem',
                 }}
               >
-                {tx(`Max ${maxScrapedRadius} km`, `Maks. ${maxScrapedRadius} km`)}
+                {tx(`Maks. ${maxScrapedRadius} km`, `Maks. ${maxScrapedRadius} km`)}
               </span>
             )}
           </div>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-            <div className="radius-pills" style={{ display: 'flex', gap: '4px' }}>
-              {(isSingaporeAnchor
-                ? [1, 2, 5, 10, 15, 20]
-                : [1, 2, 5, 10].filter((r) => r <= maxScrapedRadius)
-              ).map((r) => (
-                <button
-                  key={r}
-                  type="button"
-                  className={`pill-btn ${radiusKm === r ? 'active' : ''}`}
-                  onClick={() => {
-                    setRadiusKm(r);
-                    setPage(1);
-                  }}
-                  title={tx(`Filter within ${r} km`, `Filter dalam radius ${r} km`)}
-                  style={{ minHeight: '38px', minWidth: '42px', padding: '0 8px', fontSize: '0.8125rem' }}
-                >
-                  {r} km
-                </button>
-              ))}
-            </div>
-
-            <button
-              type="button"
-              className={`btn ${showMap ? 'btn-primary' : 'btn-secondary'} btn-sm`}
-              onClick={handleToggleMap}
-              style={{ minHeight: '38px', padding: '0 12px', fontSize: '0.8125rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
-              title={tx('Show or hide the interactive map', 'Tampilkan atau sembunyikan peta interaktif')}
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
-              <span>{showMap ? tx('Sembunyikan Peta', 'Sembunyikan Peta') : tx('Tampilkan Peta', 'Tampilkan Peta')}</span>
-            </button>
+          <div className="radius-pills" style={{ display: 'flex', gap: '4px' }}>
+            {(isSingaporeAnchor
+              ? [1, 2, 5, 10, 15, 20]
+              : [1, 2, 5, 10].filter((r) => r <= maxScrapedRadius)
+            ).map((r) => (
+              <button
+                key={r}
+                type="button"
+                className={`pill-btn ${radiusKm === r ? 'active' : ''}`}
+                onClick={() => {
+                  setRadiusKm(r);
+                  setPage(1);
+                }}
+                title={tx(`Filter within ${r} km`, `Filter dalam radius ${r} km`)}
+                style={{ minHeight: '36px', minWidth: '42px', padding: '0 8px', fontSize: '0.8125rem' }}
+              >
+                {r} km
+              </button>
+            ))}
           </div>
+
+          <button
+            type="button"
+            className={`btn ${showMap ? 'btn-primary' : 'btn-secondary'} btn-sm`}
+            onClick={handleToggleMap}
+            style={{ minHeight: '36px', padding: '0 12px', fontSize: '0.8125rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            title={tx('Show or hide the interactive map', 'Tampilkan atau sembunyikan peta interaktif')}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><polygon points="3 6 9 3 15 6 21 3 21 18 15 21 9 18 3 21"/><line x1="9" y1="3" x2="9" y2="18"/><line x1="15" y1="6" x2="15" y2="21"/></svg>
+            <span>{showMap ? tx('Sembunyikan Peta', 'Sembunyikan Peta') : tx('Tampilkan Peta', 'Tampilkan Peta')}</span>
+          </button>
         </div>
       </section>
 
@@ -2178,18 +2169,18 @@ export default function DashboardPage() {
                     setPage(1);
                   }}
                   style={{
-                    padding: '0.4375rem 1rem',
+                    padding: '0.4375rem 0.875rem',
                     fontSize: '0.8125rem',
                     fontWeight: isActive ? 700 : 500,
                     background: isActive ? 'var(--primary)' : 'var(--bg-card)',
                     color: isActive ? '#ffffff' : 'var(--text-main)',
-                    border: isActive ? '1px solid var(--primary)' : '1px solid var(--border-color)',
-                    borderRadius: '6px',
+                    border: isActive ? '1px solid var(--primary)' : '1px solid var(--border-subtle)',
+                    borderRadius: '8px',
                     cursor: 'pointer',
                     whiteSpace: 'nowrap',
                     transition: 'background-color 0.14s ease, border-color 0.14s ease, color 0.14s ease',
                     flexShrink: 0,
-                    minHeight: '38px'
+                    minHeight: '36px'
                   }}
                 >
                   {tab.label}
@@ -2222,7 +2213,7 @@ export default function DashboardPage() {
                   gap: '6px',
                   background: tsvCopied ? 'var(--success-bg)' : 'var(--bg-card)',
                   color: tsvCopied ? 'var(--success-text)' : 'inherit',
-                  borderColor: tsvCopied ? 'var(--success-border)' : 'var(--border-color)'
+                  borderColor: tsvCopied ? 'var(--success-border)' : 'var(--border-subtle)'
                 }}
                 title={lang === 'en' ? 'Copy all rows on this page in TSV format to paste directly into Google Sheets or Excel' : 'Salin semua baris di halaman ini ke format TSV untuk dipaste langsung di Google Sheets atau Excel'}
               >

@@ -257,7 +257,7 @@ function StatsSection({
             </p>
           </div>
 
-          <div style={{ display: 'flex', gap: '8px', marginTop: '14px', paddingTop: '10px', borderTop: '1px solid var(--border-subtle)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginTop: '14px', paddingTop: '10px', borderTop: '1px solid var(--border-subtle)', minHeight: '36px' }}>
             <div
               style={{
                 flex: 1,

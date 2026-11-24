@@ -303,6 +303,7 @@ export async function GET(request) {
       ${whereClause};
     `;
     const todayPrefix = new Date().toISOString().slice(0, 10);
+    const threeDaysAgoPrefix = new Date(Date.now() - 3 * 24 * 60 * 60 * 1000).toISOString().slice(0, 10);
     const tLogFilter = tid ? `tenant_id = ?` : `(tenant_id IS NULL OR tenant_id = 'tnt_master' OR tenant_id = '')`;
     const tOverlayFilter = tid ? `tenant_id = ?` : `(tenant_id IS NULL OR tenant_id = 'tnt_master' OR tenant_id = '')`;
     const tArg = tid ? [tid] : [];
@@ -314,7 +315,7 @@ export async function GET(request) {
         (SELECT COUNT(*) FROM sg_outreach_logs WHERE (sent_date = ? OR created_at LIKE ?) AND place_id IS NOT NULL AND place_id != '' AND ${tLogFilter}) as today_sent,
         (SELECT COUNT(*) FROM prebuilt_websites WHERE place_id IN (SELECT place_id FROM sg_outreach_logs WHERE (sent_date = ? OR created_at LIKE ?) AND place_id IS NOT NULL AND place_id != '' AND ${tLogFilter})) as today_prebuilt,
         (SELECT COUNT(*) FROM sg_outreach_logs WHERE COALESCE(followup_count, 0) > 0 AND ${tLogFilter}) as global_followed_up,
-        (SELECT COUNT(*) FROM sg_outreach_logs WHERE COALESCE(followup_count, 0) = 0 AND date(created_at) <= date('now', '-3 days') AND ${tLogFilter}) as global_unreplied_eligible,
+        (SELECT COUNT(*) FROM sg_outreach_logs WHERE COALESCE(followup_count, 0) = 0 AND SUBSTR(created_at, 1, 10) <= ? AND ${tLogFilter}) as global_unreplied_eligible,
         (SELECT COUNT(*) FROM places_status_overlay WHERE reach_status = 'replied' AND ${tOverlayFilter}) as global_replied,
         (SELECT COUNT(*) FROM places_status_overlay WHERE reach_status = 'lost' AND ${tOverlayFilter}) as global_lost,
         (SELECT COUNT(*) FROM sg_outreach_logs WHERE status = 'delivered_ooo' AND ${tLogFilter}) as global_ooo;
@@ -325,7 +326,7 @@ export async function GET(request) {
       todayPrefix, `${todayPrefix}%`, ...tArg,
       todayPrefix, `${todayPrefix}%`, ...tArg,
       ...tArg,
-      ...tArg,
+      threeDaysAgoPrefix, ...tArg,
       ...tArg,
       ...tArg,
       ...tArg
