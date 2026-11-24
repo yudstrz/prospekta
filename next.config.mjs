@@ -1,5 +1,6 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
+  serverExternalPackages: ['@libsql/client', '@neondatabase/serverless'],
   experimental: {
     agentUpgrade: 'security',
   },
