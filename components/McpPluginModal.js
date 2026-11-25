@@ -1,24 +1,53 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { copyToClipboard } from '@/lib/clipboard';
 import { IconCheck } from './icons';
 import { ProspektaMark } from './ProspektaLogo';
 
-const IconCopy = () => (
-  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="9" y="9" width="13" height="13" rx="2" ry="2"/><path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"/></svg>
-);
+const DEFAULT_PROVIDERS = [
+  {
+    id: 'gemini',
+    name: 'Google Gemini',
+    defaultModel: 'gemini-2.5-flash',
+    models: ['gemini-2.5-flash'],
+    placeholder: 'AIzaSy...',
+    docsUrl: 'https://aistudio.google.com/apikey',
+    guide: 'Buka Google AI Studio -> Create API Key -> pilih project Google Cloud -> salin API key berawalan AIza.',
+  },
+  {
+    id: 'openai',
+    name: 'OpenAI ChatGPT',
+    defaultModel: 'gpt-4o-mini',
+    models: ['gpt-4o-mini', 'gpt-4o'],
+    placeholder: 'sk-proj-...',
+    docsUrl: 'https://platform.openai.com/api-keys',
+    guide: 'Buka OpenAI Platform -> API Keys -> Create new secret key -> salin secret key berawalan sk-.',
+  },
+  {
+    id: 'claude',
+    name: 'Anthropic Claude',
+    defaultModel: 'claude-3-5-sonnet-latest',
+    models: ['claude-3-5-sonnet-latest', 'claude-3-5-haiku-latest'],
+    placeholder: 'sk-ant-...',
+    docsUrl: 'https://console.anthropic.com/settings/keys',
+    guide: 'Buka Anthropic Console -> Settings -> API Keys -> Create Key -> salin key berawalan sk-ant-.',
+  },
+];
 
-export default function McpPluginModal({ onClose, currentSession }) {
-  const [tokens, setTokens] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [tokenError, setTokenError] = useState('');
-  const [newToken, setNewToken] = useState(null);
-  const [label, setLabel] = useState('Plugin AI Utama');
-  const [generating, setGenerating] = useState(false);
-  const [copiedKey, setCopiedKey] = useState(null);
-  const [activeTab, setActiveTab] = useState('tokens');
+export default function McpPluginModal({ onClose, currentSession, onKeysChanged, initialTab = 'ai_keys' }) {
+  const [activeTab, setActiveTab] = useState(initialTab);
 
+  // BYOK AI Keys state
+  const [providers, setProviders] = useState(DEFAULT_PROVIDERS);
+  const [savedKeys, setSavedKeys] = useState([]);
+  const [keysLoading, setKeysLoading] = useState(true);
+  const [selectedProvider, setSelectedProvider] = useState('gemini');
+  const [apiKeyInput, setApiKeyInput] = useState('');
+  const [showRawKey, setShowRawKey] = useState(false);
+  const [keyBusy, setKeyBusy] = useState(false);
+  const [keyMsg, setKeyMsg] = useState(null);
+
+  // Email Connector state
   const [emailConn, setEmailConn] = useState({
     mode: 'gmail_mcp',
     mcpEmail: '',
@@ -37,13 +66,10 @@ export default function McpPluginModal({ onClose, currentSession }) {
 
   const role = currentSession?.role || 'user';
   const isAdmin = role === 'admin';
-  const endpointPath = isAdmin ? '/api/mcp/admin' : '/api/mcp/user';
-  const origin = typeof window !== 'undefined' ? window.location.origin : 'https://prospektas.vercel.app';
-  const fullMcpUrl = `${origin}${endpointPath}`;
-  const openApiUrl = `${origin}/api/mcp/openapi.json?scope=${role}`;
+  const providerMeta = providers.find((p) => p.id === selectedProvider) || DEFAULT_PROVIDERS[0];
 
   useEffect(() => {
-    fetchTokens();
+    fetchAiKeys();
     fetchEmailSettings();
     const onKey = (e) => {
       if (e.key === 'Escape') onClose();
@@ -51,23 +77,6 @@ export default function McpPluginModal({ onClose, currentSession }) {
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
-
-  const fetchTokens = async () => {
-    try {
-      setLoading(true);
-      setTokenError('');
-      const res = await fetch('/api/mcp/tokens');
-      const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Gagal memuat daftar token MCP.');
-      }
-      setTokens(data.tokens || []);
-    } catch (err) {
-      setTokenError(err.message);
-    } finally {
-      setLoading(false);
-    }
-  };
 
   const applyEmailSettings = (s) => {
     if (!s) return;
@@ -87,6 +96,26 @@ export default function McpPluginModal({ onClose, currentSession }) {
     }));
   };
 
+  const fetchAiKeys = async () => {
+    try {
+      setKeysLoading(true);
+      const res = await fetch('/api/ai-settings');
+      const data = await res.json();
+      if (res.ok && data.success) {
+        if (Array.isArray(data.providers) && data.providers.length > 0) {
+          setProviders(data.providers);
+        }
+        setSavedKeys(data.keys || []);
+        if (data.activeProvider) {
+          setSelectedProvider(data.activeProvider);
+        }
+      }
+    } catch (_) {
+    } finally {
+      setKeysLoading(false);
+    }
+  };
+
   const fetchEmailSettings = async () => {
     try {
       const res = await fetch('/api/settings');
@@ -98,41 +127,76 @@ export default function McpPluginModal({ onClose, currentSession }) {
     } catch (_) {}
   };
 
-  const handleGenerateToken = async (e) => {
+  const handleSaveAiKey = async (e) => {
     e.preventDefault();
+    if (!apiKeyInput.trim()) return;
+    setKeyBusy(true);
+    setKeyMsg(null);
     try {
-      setGenerating(true);
-      setTokenError('');
-      const res = await fetch('/api/mcp/tokens', {
+      const res = await fetch('/api/ai-settings', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label })
+        body: JSON.stringify({
+          provider: selectedProvider,
+          apiKey: apiKeyInput.trim(),
+        }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Gagal membuat token MCP baru.');
+        throw new Error(data.error || 'Gagal menguji atau menyimpan API Key.');
       }
-      setNewToken(data.token);
-      fetchTokens();
+      setSavedKeys(data.keys || []);
+      setApiKeyInput('');
+      setShowRawKey(false);
+      setKeyMsg({ ok: true, text: data.message });
+      onKeysChanged?.();
     } catch (err) {
-      setTokenError(err.message);
+      setKeyMsg({ ok: false, text: err.message });
     } finally {
-      setGenerating(false);
+      setKeyBusy(false);
     }
   };
 
-  const handleRevoke = async (id) => {
-    if (!confirm('Yakin ingin mencabut token MCP ini? Klien AI yang menggunakannya tidak akan bisa mengakses lagi.')) return;
+  const handleActivateProvider = async (provider) => {
+    setKeyBusy(true);
+    setKeyMsg(null);
     try {
-      setTokenError('');
-      const res = await fetch(`/api/mcp/tokens?id=${encodeURIComponent(id)}`, { method: 'DELETE' });
+      const res = await fetch('/api/ai-settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider }),
+      });
       const data = await res.json();
-      if (!res.ok || !data.success) {
-        throw new Error(data.error || 'Gagal mencabut token.');
-      }
-      fetchTokens();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Gagal mengganti provider aktif.');
+      setSavedKeys(data.keys || []);
+      setSelectedProvider(provider);
+      setKeyMsg({ ok: true, text: data.message });
+      onKeysChanged?.();
     } catch (err) {
-      setTokenError(err.message);
+      setKeyMsg({ ok: false, text: err.message });
+    } finally {
+      setKeyBusy(false);
+    }
+  };
+
+  const handleDeleteKey = async (provider) => {
+    const label = providers.find((p) => p.id === provider)?.name || provider;
+    if (!confirm(`Hapus API Key ${label} dari akun Anda?`)) return;
+    setKeyBusy(true);
+    setKeyMsg(null);
+    try {
+      const res = await fetch(`/api/ai-settings?provider=${encodeURIComponent(provider)}`, {
+        method: 'DELETE',
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) throw new Error(data.error || 'Gagal menghapus API Key.');
+      setSavedKeys(data.keys || []);
+      setKeyMsg({ ok: true, text: data.message });
+      onKeysChanged?.();
+    } catch (err) {
+      setKeyMsg({ ok: false, text: err.message });
+    } finally {
+      setKeyBusy(false);
     }
   };
 
@@ -194,52 +258,33 @@ export default function McpPluginModal({ onClose, currentSession }) {
     }
   };
 
-  const handleCopy = async (text, key) => {
-    const ok = await copyToClipboard(text);
-    if (ok) {
-      setCopiedKey(key);
-      setTimeout(() => setCopiedKey(null), 2000);
-    }
-  };
-
-  const codeBoxStyle = {
-    flex: 1,
-    padding: '8px 10px',
-    background: 'var(--bg-card)',
-    color: 'var(--text-main)',
-    borderRadius: '6px',
-    border: '1px solid var(--border-subtle)',
-    fontSize: '0.8rem',
-    wordBreak: 'break-all',
-  };
-
   return (
     <div
       className="modal-overlay"
       role="dialog"
       aria-modal="true"
-      aria-labelledby="mcp-plugin-modal-title"
+      aria-labelledby="ai-settings-modal-title"
       onClick={onClose}
     >
       <div
         className="modal-content"
         onClick={(e) => e.stopPropagation()}
-        style={{ maxWidth: '760px', width: '100%', maxHeight: '90vh', overflowY: 'auto' }}
+        style={{ maxWidth: '720px', width: '100%', maxHeight: '90vh', overflowY: 'auto' }}
       >
         <div className="modal-header" style={{ alignItems: 'flex-start', gap: '12px' }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: '12px', minWidth: 0 }}>
             <ProspektaMark size={36} />
             <div style={{ minWidth: 0 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                <h2 id="mcp-plugin-modal-title" className="modal-title" style={{ margin: 0, fontSize: '1.15rem' }}>
-                  Prospekta Universal MCP Hub
+                <h2 id="ai-settings-modal-title" className="modal-title" style={{ margin: 0, fontSize: '1.12rem' }}>
+                  Pengaturan Integrasi AI (API Key)
                 </h2>
                 <span className={`reach-tab-pill-${isAdmin ? 'success' : 'primary'}`} style={{ textTransform: 'uppercase', fontSize: '11px', fontWeight: 700 }}>
-                  Role: {role}
+                  {currentSession?.email || role}
                 </span>
               </div>
               <p style={{ margin: '4px 0 0', fontSize: '0.8125rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
-                Hubungkan data prospek, PDF proposal, website preview, &amp; AI Agent ke Gemini, ChatGPT, Claude, atau klien MCP lainnya.
+                Hubungkan API Key Gemini, OpenAI, atau Claude langsung di akun Anda (enkripsi AES-256-GCM, tanpa konfigurasi file lokal).
               </p>
             </div>
           </div>
@@ -254,178 +299,184 @@ export default function McpPluginModal({ onClose, currentSession }) {
           </button>
         </div>
 
-        <div style={{ display: 'flex', gap: '6px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
           {[
-            { id: 'tokens', label: 'Token Akses MCP' },
-            { id: 'gemini', label: 'Gemini / Antigravity' },
-            { id: 'gpt', label: 'ChatGPT (Custom GPT)' },
-            { id: 'claude', label: 'Claude / Cursor' },
-            { id: 'email', label: 'Konektor Email MCP' }
+            { id: 'ai_keys', label: 'Kunci API AI (BYOK)' },
+            { id: 'email', label: 'Konektor Email' },
           ].map((tab) => (
             <button
               key={tab.id}
               type="button"
               className={`btn btn-sm ${activeTab === tab.id ? 'btn-primary' : 'btn-secondary'}`}
               onClick={() => setActiveTab(tab.id)}
-              style={{ fontSize: '0.78rem', padding: '0.35rem 0.75rem', minHeight: '36px' }}
+              style={{ fontSize: '0.8rem', padding: '0.4rem 0.85rem', minHeight: '38px' }}
             >
               {tab.label}
             </button>
           ))}
         </div>
 
-        {activeTab === 'tokens' && (
-          <div>
-            {tokenError && (
-              <div role="alert" style={{ background: 'rgba(239, 68, 68, 0.12)', border: '1px solid rgba(239, 68, 68, 0.35)', color: '#ef4444', padding: '10px 12px', borderRadius: '8px', fontSize: '0.8125rem', marginBottom: '1rem' }}>
-                {tokenError}
+        {activeTab === 'ai_keys' && (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '0.875rem', color: 'var(--text-main)' }}>
+            {keyMsg && (
+              <div role="status" style={{ background: keyMsg.ok ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)', border: `1px solid ${keyMsg.ok ? 'rgba(16, 185, 129, 0.35)' : 'rgba(239, 68, 68, 0.35)'}`, color: keyMsg.ok ? '#10b981' : '#ef4444', padding: '10px 12px', borderRadius: '8px', fontSize: '0.8125rem' }}>
+                {keyMsg.text}
               </div>
             )}
 
-            <form onSubmit={handleGenerateToken} style={{ display: 'flex', gap: '8px', marginBottom: '1rem', flexWrap: 'wrap' }}>
-              <input
-                type="text"
-                className="text-input"
-                aria-label="Label token MCP"
-                placeholder="Label token (contoh: Gemini CLI / ChatGPT Pro)"
-                value={label}
-                onChange={(e) => setLabel(e.target.value)}
-                style={{ flex: '1 1 220px', minHeight: '38px' }}
-                required
-              />
-              <button type="submit" className="btn btn-primary btn-sm" disabled={generating} style={{ minHeight: '38px' }}>
-                {generating ? 'Membuat...' : '+ Buat Token Baru'}
-              </button>
-            </form>
+            <form
+              onSubmit={handleSaveAiKey}
+              style={{ background: 'var(--bg-app)', padding: '14px', borderRadius: '10px', border: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: '12px' }}
+            >
+              <div>
+                <label htmlFor="ai-provider-select" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, marginBottom: '5px' }}>
+                  Pilih Penyedia AI
+                </label>
+                <select
+                  id="ai-provider-select"
+                  className="select-input"
+                  value={selectedProvider}
+                  onChange={(e) => {
+                    setSelectedProvider(e.target.value);
+                    setApiKeyInput('');
+                    setKeyMsg(null);
+                  }}
+                  style={{ minHeight: '40px' }}
+                >
+                  {providers.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name} ({p.defaultModel})
+                    </option>
+                  ))}
+                </select>
+              </div>
 
-            {newToken && (
-              <div style={{ background: 'rgba(16, 185, 129, 0.12)', border: '1px solid rgba(16, 185, 129, 0.35)', padding: '12px', borderRadius: '8px', marginBottom: '1rem' }}>
-                <div style={{ fontWeight: 600, color: '#10b981', fontSize: '0.875rem', marginBottom: '6px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <IconCheck size={14} />
-                  <span>Token Berhasil Dibuat (simpan sekarang, hanya tampil sekali):</span>
-                </div>
-                <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                  <code style={{ ...codeBoxStyle, fontWeight: 700 }}>
-                    {newToken}
-                  </code>
+              <div>
+                <label htmlFor="ai-api-key-input" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, marginBottom: '5px' }}>
+                  API Key {providerMeta.name}
+                </label>
+                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                  <input
+                    id="ai-api-key-input"
+                    type={showRawKey ? 'text' : 'password'}
+                    className="text-input"
+                    autoComplete="off"
+                    placeholder={`Masukkan API Key ${providerMeta.name} (${providerMeta.placeholder})`}
+                    value={apiKeyInput}
+                    onChange={(e) => setApiKeyInput(e.target.value)}
+                    style={{ flex: '1 1 260px', minHeight: '40px' }}
+                    required
+                  />
                   <button
                     type="button"
                     className="btn btn-secondary btn-sm"
-                    onClick={() => handleCopy(newToken, 'new_tok')}
-                    style={{ minHeight: '36px' }}
+                    onClick={() => setShowRawKey((v) => !v)}
+                    style={{ minHeight: '40px' }}
                   >
-                    {copiedKey === 'new_tok' ? <><IconCheck size={13} /> Tersalin</> : <><IconCopy /> Salin</>}
+                    {showRawKey ? 'Tutup' : 'Lihat'}
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary btn-sm"
+                    disabled={keyBusy || !apiKeyInput.trim()}
+                    style={{ minHeight: '40px' }}
+                  >
+                    {keyBusy ? 'Menguji & Menyimpan...' : 'Test & Simpan Key'}
                   </button>
                 </div>
               </div>
-            )}
 
-            <div style={{ fontSize: '0.8125rem', fontWeight: 600, marginBottom: '8px', color: 'var(--text-main)' }}>
-              Daftar Token Aktif ({tokens.length})
-            </div>
-            {loading ? (
-              <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-muted)' }}>Memuat token...</div>
-            ) : tokens.length === 0 ? (
-              <div style={{ padding: '1rem', textAlign: 'center', color: 'var(--text-muted)', border: '1px dashed var(--border-subtle)', borderRadius: '8px', fontSize: '0.84rem' }}>
-                Belum ada token MCP yang dibuat. Klik tombol di atas untuk membuat token pertama Anda.
+              <div style={{ background: 'var(--bg-card)', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border-subtle)', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                <strong style={{ color: 'var(--text-main)' }}>Cara mendapatkan key {providerMeta.name}:</strong>{' '}
+                {providerMeta.guide}{' '}
+                <a href={providerMeta.docsUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', fontWeight: 600 }}>
+                  Buka Konsol Key &rarr;
+                </a>
               </div>
-            ) : (
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-                {tokens.map((tok) => (
-                  <div key={tok.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '10px', flexWrap: 'wrap', padding: '10px 12px', background: 'var(--bg-app)', border: '1px solid var(--border-subtle)', borderRadius: '8px' }}>
-                    <div style={{ minWidth: 0 }}>
-                      <div style={{ fontWeight: 600, fontSize: '0.875rem', color: 'var(--text-main)' }}>{tok.label}</div>
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        Prefix: <code>{tok.token_prefix}</code> &bull; Scope: <strong>{tok.scope}</strong> &bull; Dibuat: {new Date(tok.created_at).toLocaleDateString('id-ID')}
-                      </div>
-                    </div>
-                    {tok.revoked_at ? (
-                      <span style={{ fontSize: '0.75rem', color: '#ef4444', fontWeight: 600 }}>Dicabut</span>
-                    ) : (
-                      <button
-                        type="button"
-                        className="btn btn-secondary btn-sm"
-                        style={{ color: '#ef4444', borderColor: 'rgba(239, 68, 68, 0.35)', fontSize: '0.75rem', minHeight: '36px' }}
-                        onClick={() => handleRevoke(tok.id)}
+            </form>
+
+            <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
+                <h3 style={{ margin: 0, fontSize: '0.875rem', fontWeight: 700 }}>
+                  Kunci API Tersimpan ({savedKeys.length})
+                </h3>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                  Terisolasi khusus akun Anda
+                </span>
+              </div>
+
+              {keysLoading ? (
+                <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--text-muted)' }}>Memuat status kunci AI...</p>
+              ) : savedKeys.length === 0 ? (
+                <div style={{ padding: '14px', borderRadius: '8px', border: '1px dashed var(--border-subtle)', color: 'var(--text-muted)', fontSize: '0.8125rem', textAlign: 'center' }}>
+                  Belum ada API Key yang tersimpan. Simpan minimal 1 key di atas untuk mengaktifkan Prospekta AI Assistant.
+                </div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                  {savedKeys.map((item) => {
+                    const meta = providers.find((p) => p.id === item.provider);
+                    return (
+                      <div
+                        key={item.id || item.provider}
+                        style={{
+                          display: 'flex',
+                          justifyContent: 'space-between',
+                          alignItems: 'center',
+                          gap: '10px',
+                          flexWrap: 'wrap',
+                          padding: '10px 12px',
+                          borderRadius: '8px',
+                          border: item.is_active ? '1px solid var(--primary)' : '1px solid var(--border-subtle)',
+                          background: item.is_active ? 'rgba(37, 99, 235, 0.06)' : 'var(--bg-app)',
+                        }}
                       >
-                        Cabut Akses
-                      </button>
-                    )}
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+                        <div style={{ minWidth: 0 }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
+                            <strong style={{ fontSize: '0.85rem' }}>{meta?.name || item.provider}</strong>
+                            <code style={{ fontSize: '0.78rem', padding: '1px 6px', borderRadius: '4px', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)' }}>
+                              {item.masked_key}
+                            </code>
+                            {item.is_active ? (
+                              <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.72rem', fontWeight: 700, color: '#10b981' }}>
+                                <IconCheck size={12} /> Terhubung &amp; Aktif
+                              </span>
+                            ) : (
+                              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>Tersimpan</span>
+                            )}
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                            Model: {(meta?.models || []).join(' / ')}
+                          </div>
+                        </div>
 
-        {activeTab === 'gemini' && (
-          <div style={{ fontSize: '0.875rem', lineHeight: 1.6, color: 'var(--text-main)' }}>
-            <p style={{ marginTop: 0 }}>Untuk menghubungkan Prospekta MCP ke <strong>Google Antigravity / Gemini CLI</strong>:</p>
-            <div style={{ background: 'var(--bg-app)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-subtle)', marginBottom: '1rem' }}>
-              <div style={{ fontWeight: 600, fontSize: '0.8125rem', marginBottom: '6px' }}>Endpoint URL:</div>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                <code style={codeBoxStyle}>{fullMcpUrl}</code>
-                <button type="button" className="btn btn-secondary btn-sm" style={{ minHeight: '36px' }} onClick={() => handleCopy(fullMcpUrl, 'gem_url')}>
-                  {copiedKey === 'gem_url' ? 'Tersalin' : 'Salin'}
-                </button>
-              </div>
+                        <div style={{ display: 'flex', gap: '6px', flexShrink: 0 }}>
+                          {!item.is_active && (
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-sm"
+                              disabled={keyBusy}
+                              onClick={() => handleActivateProvider(item.provider)}
+                              style={{ minHeight: '36px' }}
+                            >
+                              Aktifkan
+                            </button>
+                          )}
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            disabled={keyBusy}
+                            onClick={() => handleDeleteKey(item.provider)}
+                            style={{ minHeight: '36px', color: '#ef4444' }}
+                          >
+                            Hapus Key
+                          </button>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
             </div>
-
-            <p style={{ fontWeight: 600, margin: '8px 0 6px' }}>Konfigurasi <code>settings.json</code> atau <code>mcp_config.json</code>:</p>
-            <pre style={{ background: '#090d16', color: '#38bdf8', padding: '12px', borderRadius: '8px', fontSize: '12px', overflowX: 'auto', margin: 0 }}>
-{`{
-  "mcpServers": {
-    "prospekta": {
-      "url": "${fullMcpUrl}",
-      "headers": {
-        "Authorization": "Bearer <TOKEN_MCP_ANDA>"
-      }
-    }
-  }
-}`}
-            </pre>
-          </div>
-        )}
-
-        {activeTab === 'gpt' && (
-          <div style={{ fontSize: '0.875rem', lineHeight: 1.6, color: 'var(--text-main)' }}>
-            <p style={{ marginTop: 0 }}>Untuk menghubungkan Prospekta ke <strong>ChatGPT (Custom GPT Actions)</strong>:</p>
-            <ol style={{ paddingLeft: '1.25rem', margin: '0 0 1rem' }}>
-              <li>Buka GPT Builder di ChatGPT &gt; Tab <strong>Configure</strong> &gt; Klik <strong>Create new action</strong>.</li>
-              <li>Pilih opsi <strong>Import from URL</strong> dan masukkan URL skema OpenAPI di bawah:</li>
-            </ol>
-
-            <div style={{ background: 'var(--bg-app)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-subtle)', marginBottom: '1rem' }}>
-              <div style={{ fontWeight: 600, fontSize: '0.8125rem', marginBottom: '6px' }}>OpenAPI Schema URL:</div>
-              <div style={{ display: 'flex', gap: '8px', alignItems: 'center', flexWrap: 'wrap' }}>
-                <code style={codeBoxStyle}>{openApiUrl}</code>
-                <button type="button" className="btn btn-secondary btn-sm" style={{ minHeight: '36px' }} onClick={() => handleCopy(openApiUrl, 'gpt_url')}>
-                  {copiedKey === 'gpt_url' ? 'Tersalin' : 'Salin'}
-                </button>
-              </div>
-            </div>
-
-            <p style={{ marginBottom: 0 }}>3. Di bagian <strong>Authentication</strong>, pilih tipe <strong>Bearer</strong> dan tempelkan token MCP Anda (<code>{isAdmin ? 'psk_adm_...' : 'psk_usr_...'}</code>).</p>
-          </div>
-        )}
-
-        {activeTab === 'claude' && (
-          <div style={{ fontSize: '0.875rem', lineHeight: 1.6, color: 'var(--text-main)' }}>
-            <p style={{ marginTop: 0 }}>Untuk menghubungkan ke <strong>Claude Desktop</strong> atau <strong>Cursor IDE</strong>:</p>
-            <pre style={{ background: '#090d16', color: '#38bdf8', padding: '12px', borderRadius: '8px', fontSize: '12px', overflowX: 'auto', margin: 0 }}>
-{`{
-  "mcpServers": {
-    "prospekta": {
-      "command": "npx",
-      "args": ["-y", "prospekta-mcp-plugin"],
-      "env": {
-        "PROSPEKTA_MCP_URL": "${fullMcpUrl}",
-        "PROSPEKTA_MCP_TOKEN": "<TOKEN_MCP_ANDA>"
-      }
-    }
-  }
-}`}
-            </pre>
           </div>
         )}
 

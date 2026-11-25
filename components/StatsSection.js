@@ -291,7 +291,7 @@ function StatsSection({
           <div>
             <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '8px' }}>
               <span style={{ fontSize: '11px', fontWeight: 700, letterSpacing: '0.06em', textTransform: 'uppercase', color: 'var(--text-muted)' }}>
-                {tx('Prebuilt Sites & MCP', 'Situs Prebuilt & MCP')}
+                {tx('Prebuilt Sites & AI', 'Website & Integrasi AI')}
               </span>
               <button
                 type="button"
@@ -309,9 +309,9 @@ function StatsSection({
                   alignItems: 'center',
                   gap: '4px',
                 }}
-                title={tx('Open MCP Plugin settings', 'Buka pengaturan plugin MCP')}
+                title={tx('Manage BYOK AI API Key & Email Settings', 'Kelola API Key AI & Konektor Email')}
               >
-                <span>MCP Hub</span>
+                <span>Integrasi AI</span>
                 <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
               </button>
             </div>

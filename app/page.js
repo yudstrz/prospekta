@@ -63,6 +63,10 @@ const McpPluginModal = dynamic(() => import('@/components/McpPluginModal'), {
   ssr: false
 });
 
+const AiAssistantPanel = dynamic(() => import('@/components/AiAssistantPanel'), {
+  ssr: false
+});
+
 const NotificationsModal = dynamic(() => import('@/components/NotificationsModal'), {
   ssr: false
 });
@@ -324,6 +328,8 @@ export default function DashboardPage() {
   const [currentSession, setCurrentSession] = useState(null);
   const [tenantSettings, setTenantSettings] = useState(null);
   const [isCrawlerOpen, setIsCrawlerOpen] = useState(false);
+  const [isAiPanelOpen, setIsAiPanelOpen] = useState(false);
+  const [aiKeysRefreshKey, setAiKeysRefreshKey] = useState(0);
   const [isProfileSummaryExpanded, setIsProfileSummaryExpanded] = useState(true);
   const [theme, setTheme] = useState('light');
   const [showMap, setShowMap] = useState(true);
@@ -1037,12 +1043,23 @@ export default function DashboardPage() {
             <button
               type="button"
               className="prospekta-nav-item"
+              onClick={() => setIsAiPanelOpen((v) => !v)}
+              title={tx('Open Prospekta In-App AI Assistant', 'Buka Asisten AI Prospekta')}
+              style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+              <span>{tx('AI Assistant', 'Asisten AI')}</span>
+            </button>
+
+            <button
+              type="button"
+              className="prospekta-nav-item"
               onClick={() => setActiveModal('mcp_plugin')}
-              title={tx('Universal MCP Plugin & AI Agent connector', 'Universal MCP Plugin & AI Agent')}
+              title={tx('AI API Key (BYOK) & Email Connector Settings', 'Pengaturan API Key AI (BYOK) & Konektor Email')}
               style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
             >
               <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-              <span>{tx('MCP Hub', 'Plugin MCP')}</span>
+              <span>{tx('AI Settings', 'Integrasi AI')}</span>
             </button>
           </nav>
 
@@ -1052,8 +1069,8 @@ export default function DashboardPage() {
               type="button"
               className="btn btn-secondary btn-icon-only"
               onClick={() => setActiveModal('mcp_plugin')}
-              title="Buka Universal MCP Plugin"
-              aria-label="MCP Plugin"
+              title="Pengaturan Integrasi AI (API Key)"
+              aria-label="Integrasi AI"
               style={{ padding: '0.4rem', minHeight: '38px', minWidth: '38px' }}
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
@@ -3371,9 +3388,20 @@ export default function DashboardPage() {
       {activeModal === 'mcp_plugin' && (
         <McpPluginModal
           currentSession={currentSession}
+          onKeysChanged={() => setAiKeysRefreshKey((k) => k + 1)}
           onClose={() => setActiveModal(null)}
         />
       )}
+
+      <AiAssistantPanel
+        activeAnchor={activeAnchor}
+        radiusKm={radiusKm}
+        refreshKey={aiKeysRefreshKey}
+        isOpen={isAiPanelOpen}
+        onToggleOpen={setIsAiPanelOpen}
+        onOpenAiSettings={() => setActiveModal('mcp_plugin')}
+        onDataChanged={handleRefresh}
+      />
 
       {activeModal === 'token_usage' && (
         <TokenUsageModal
@@ -3489,13 +3517,13 @@ export default function DashboardPage() {
 
         <button
           type="button"
-          className="prospekta-mobile-tab-btn"
-          onClick={() => setActiveModal('mcp_plugin')}
+          className={`prospekta-mobile-tab-btn ${isAiPanelOpen ? 'is-active' : ''}`}
+          onClick={() => setIsAiPanelOpen((v) => !v)}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
           </svg>
-          <span>{tx('MCP Hub', 'MCP Hub')}</span>
+          <span>{tx('AI Chat', 'Asisten AI')}</span>
         </button>
 
         <button
