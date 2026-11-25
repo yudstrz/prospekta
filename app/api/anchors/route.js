@@ -88,7 +88,7 @@ export async function POST(request) {
     const lat = parseFloat(body.lat);
     const lng = parseFloat(body.lng);
     const isSg = city.toLowerCase().includes('singapore') || name.toLowerCase().includes('singapore');
-    const maxRadius = isSg && isSuperAdmin ? 20 : 2;
+    const maxRadius = isSg && isSuperAdmin ? 20 : 10;
     const radiusKm = Math.min(Math.max(parseFloat(body.radius_default_km || 2), 0.5), maxRadius);
     const address = (body.address || `Koordinat (${lat.toFixed(4)}, ${lng.toFixed(4)})`).trim();
 

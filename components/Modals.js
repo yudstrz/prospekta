@@ -76,12 +76,18 @@ function ModalWrapper({ title, onClose, maxWidth, children }) {
 }
 
 // 1. Scan Modal
-export function ScanModal({ anchors = [], activeAnchor, onClose, onScanComplete }) {
+export function ScanModal({ anchors = [], activeAnchor, initialRadius = 2, onClose, onScanComplete }) {
   const anchorList = Array.isArray(anchors) ? anchors : [];
   const initialAnchor = activeAnchor?.name || anchorList[0]?.name || '';
   const [selectedAnchor, setSelectedAnchor] = useState(initialAnchor);
-  const [radiusKm, setRadiusKm] = useState('2');
-  const [customRadius, setCustomRadius] = useState('');
+  const [radiusKm, setRadiusKm] = useState(() => {
+    const str = String(initialRadius || 2);
+    return ['1', '2', '5', '10', '15', '20'].includes(str) ? str : 'custom';
+  });
+  const [customRadius, setCustomRadius] = useState(() => {
+    const str = String(initialRadius || '');
+    return ['1', '2', '5', '10', '15', '20'].includes(str) ? '' : str;
+  });
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState(null);

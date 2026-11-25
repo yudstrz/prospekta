@@ -7,6 +7,9 @@ import { fetchOverturePlaces } from '@/lib/overture';
 import { sessionFromRequest } from '@/lib/auth';
 import crypto from 'crypto';
 
+export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
+
 export async function POST(request) {
   try {
     const body = await request.json().catch(() => ({}));
@@ -58,12 +61,13 @@ export async function POST(request) {
     // 3. Create scan log in DB
     scanId = crypto.randomUUID();
     const nowIso = new Date().toISOString();
+    const effectiveTid = tid || 'tnt_master';
     await db.execute({
       sql: `
-        INSERT INTO scans (id, anchor, radius_km, tiles_total, tiles_done, status, created_at)
-        VALUES (?, ?, ?, ?, 0, 'running', ?);
+        INSERT INTO scans (id, anchor, radius_km, tiles_total, tiles_done, status, created_at, tenant_id)
+        VALUES (?, ?, ?, ?, 0, 'running', ?, ?);
       `,
-      args: [scanId, anchor.name, radiusKm, totalTiles, nowIso]
+      args: [scanId, anchor.name, radiusKm, totalTiles, nowIso, effectiveTid]
     });
 
     const countBeforeRes = await db.execute('SELECT COUNT(*) as count FROM places;');
@@ -72,15 +76,16 @@ export async function POST(request) {
     let totalDiscovered = 0;
     let totalSaved = 0;
 
-    // 4. Fetch places (Solusi A: Multi-source live fetch via Python/Photon/Google)
+    // 4. Fetch places (Overture / ArcGIS POI + Photon OSM + Google Places)
     let places = await fetchOverturePlaces(
       bounds.minLng,
       bounds.minLat,
       bounds.maxLng,
-      bounds.maxLat
+      bounds.maxLat,
+      radiusKm
     );
 
-    // Solusi B: Jika online fetch tidak menemukan tempat, ambil dari database lokal di koordinat serupa
+    // Fallback DB lokal jika semua sumber eksternal gagal
     if (!places || places.length === 0) {
       const dbFallback = await db.execute({
         sql: 'SELECT * FROM places WHERE lat BETWEEN ? AND ? AND lng BETWEEN ? AND ? LIMIT 50;',
@@ -102,82 +107,81 @@ export async function POST(request) {
 
     totalDiscovered = places.length;
 
-    // Cek ID yang sudah ada khusus untuk anchor ini agar tidak duplikat
     const existingRes = await db.execute({
-      sql: 'SELECT overture_id FROM places WHERE anchor = ? AND lat BETWEEN ? AND ? AND lng BETWEEN ? AND ?;',
+      sql: 'SELECT overture_id, phone, website, address FROM places WHERE anchor = ? AND lat BETWEEN ? AND ? AND lng BETWEEN ? AND ?;',
       args: [anchor.name, bounds.minLat, bounds.maxLat, bounds.minLng, bounds.maxLng]
     });
-    const existingIds = new Set((existingRes.rows || []).map(r => r.overture_id));
+    const existingMap = new Map((existingRes.rows || []).map((r) => [r.overture_id, r]));
 
-    let batchStatements = [];
+    const rowsToUpsert = [];
+    const seenIds = new Set();
 
     for (const p of places) {
-      if (!p.lat || !p.lng || !p.name) continue;
+      if (!p.lat || !p.lng || !p.name || seenIds.has(p.id)) continue;
 
-      // Calculate circular distance to anchor
       const dist = haversineDistance(centerLat, centerLng, p.lat, p.lng);
-      if (dist > radiusKm * 1000) {
-        continue;
-      }
+      if (dist > radiusKm * 1000) continue;
 
-      // Lewati tempat yang sudah tersimpan di database
-      if (existingIds.has(p.id)) {
-        continue;
-      }
-
+      const prev = existingMap.get(p.id);
       const normPhone = normalizePhone(p.phone);
+      const hasNewData = prev && ((!prev.phone && normPhone) || (!prev.website && p.website) || (!prev.address && p.address));
+      if (prev && !hasNewData) continue;
+
+      seenIds.add(p.id);
       const bidang = await mapCategoryToBidang(p.category);
       const emailSource = p.email ? 'overture' : null;
+      rowsToUpsert.push([
+        p.id,
+        anchor.name,
+        p.name,
+        p.category || null,
+        bidang,
+        p.address || null,
+        p.lat,
+        p.lng,
+        dist,
+        normPhone,
+        p.website || null,
+        p.email || null,
+        emailSource,
+        'pending',
+        p.confidence || 0,
+        'overture',
+        nowIso,
+        'new',
+        tid || null
+      ]);
+    }
 
-      batchStatements.push({
+    // Bulk multi-row UPSERT (80 baris per 1 query SQL agar cepat di Neon PostgreSQL maupun SQLite)
+    const CHUNK_SIZE = 80;
+    const colCount = 19;
+    const singleTuple = `(${Array(colCount).fill('?').join(', ')})`;
+
+    for (let i = 0; i < rowsToUpsert.length; i += CHUNK_SIZE) {
+      const chunk = rowsToUpsert.slice(i, i + CHUNK_SIZE);
+      const valuesClause = Array(chunk.length).fill(singleTuple).join(', ');
+      const args = chunk.flat();
+
+      await db.execute({
         sql: `
           INSERT INTO places (
             overture_id, anchor, name, category_raw, bidang_usaha, address,
             lat, lng, distance_m, phone, website, email, email_source,
-            enrich_status, confidence, source, scraped_at, reach_status
-          ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'pending', ?, 'overture', ?, 'new')
+            enrich_status, confidence, source, scraped_at, reach_status, tenant_id
+          ) VALUES ${valuesClause}
           ON CONFLICT(overture_id) DO UPDATE SET
             anchor = CASE WHEN excluded.distance_m < places.distance_m THEN excluded.anchor ELSE places.anchor END,
             distance_m = CASE WHEN excluded.distance_m < places.distance_m THEN excluded.distance_m ELSE places.distance_m END,
             phone = COALESCE(places.phone, excluded.phone),
             website = COALESCE(places.website, excluded.website),
             email = COALESCE(places.email, excluded.email),
-            address = COALESCE(places.address, excluded.address)
-          WHERE excluded.distance_m < places.distance_m
-             OR (places.phone IS NULL AND excluded.phone IS NOT NULL)
-             OR (places.website IS NULL AND excluded.website IS NOT NULL)
-             OR (places.email IS NULL AND excluded.email IS NOT NULL);
+            address = COALESCE(places.address, excluded.address),
+            tenant_id = COALESCE(places.tenant_id, excluded.tenant_id);
         `,
-        args: [
-          p.id,
-          anchor.name,
-          p.name,
-          p.category || null,
-          bidang,
-          p.address || null,
-          p.lat,
-          p.lng,
-          dist,
-          normPhone,
-          p.website || null,
-          p.email || null,
-          emailSource,
-          p.confidence || 0,
-          nowIso
-        ]
+        args
       });
-
-      if (batchStatements.length >= 100) {
-        await db.batch(batchStatements);
-        totalSaved += batchStatements.length;
-        batchStatements = [];
-      }
-    }
-
-    if (batchStatements.length > 0) {
-      await db.batch(batchStatements);
-      totalSaved += batchStatements.length;
-      batchStatements = [];
+      totalSaved += chunk.length;
     }
 
     // 5. Mark scan as done

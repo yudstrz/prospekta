@@ -402,10 +402,10 @@ export default function DashboardPage() {
     activeAnchor?.name?.toLowerCase()?.includes('sg') ||
     activeAnchor?.name?.toLowerCase()?.includes('singapore')
   );
-  // Singapore supports up to 20 km. Indonesia offices & custom anchors only scrape up to radius_default_km (typically 2 km) to save Turso quota.
-  const maxScrapedRadius = isSingaporeAnchor ? 20 : (Number(activeAnchor?.radius_default_km) || 2);
+  // Indonesia/custom anchors mendukung hingga 10 km (1, 2, 5, 10); Singapore hingga 20 km.
+  const maxScrapedRadius = isSingaporeAnchor ? 20 : Math.max(Number(activeAnchor?.radius_default_km) || 10, 10);
 
-  // Auto-clamp radiusKm if selected anchor scraped radius boundary is smaller than current radius
+  // Auto-clamp radiusKm jika melebihi batas maksimal anchor terpilih
   useEffect(() => {
     if (!activeAnchor) return;
     const isSg = Boolean(
@@ -414,7 +414,7 @@ export default function DashboardPage() {
       activeAnchor?.name?.toLowerCase()?.includes('sg') ||
       activeAnchor?.name?.toLowerCase()?.includes('singapore')
     );
-    const maxR = isSg ? 20 : (Number(activeAnchor?.radius_default_km) || 2);
+    const maxR = isSg ? 20 : Math.max(Number(activeAnchor?.radius_default_km) || 10, 10);
     if (radiusKm > maxR) {
       setRadiusKm(maxR);
     }
@@ -626,7 +626,7 @@ export default function DashboardPage() {
       anchor: activeAnchor.name,
       max_distance: (radiusKm * 1000).toString(),
       map_points: 'true',
-      map_limit: '600'
+      map_limit: '1000'
     });
 
     if (debouncedSearch) mapParams.append('search', debouncedSearch);
@@ -1412,26 +1412,11 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', flexShrink: 0, flexWrap: 'wrap' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.625rem', flexShrink: 0, flexWrap: 'wrap' }}>
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}>
             <span style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-main)' }}>
               {tx('Radius:', 'Radius:')}
             </span>
-            {maxScrapedRadius <= 2 && (
-              <span
-                style={{
-                  fontSize: '0.6875rem',
-                  fontWeight: 600,
-                  color: 'var(--text-muted)',
-                  background: 'var(--bg-card-subtle)',
-                  border: '1px solid var(--border-subtle)',
-                  borderRadius: '9999px',
-                  padding: '0.0625rem 0.4375rem',
-                }}
-              >
-                {tx(`Maks. ${maxScrapedRadius} km`, `Maks. ${maxScrapedRadius} km`)}
-              </span>
-            )}
           </div>
 
           <div className="radius-pills" style={{ display: 'flex', gap: '4px' }}>
@@ -1448,12 +1433,24 @@ export default function DashboardPage() {
                   setPage(1);
                 }}
                 title={tx(`Filter within ${r} km`, `Filter dalam radius ${r} km`)}
-                style={{ minHeight: '36px', minWidth: '42px', padding: '0 8px', fontSize: '0.8125rem' }}
+                style={{ minHeight: '36px', minWidth: '44px', padding: '0 8px', fontSize: '0.8125rem' }}
               >
                 {r} km
               </button>
             ))}
           </div>
+
+          <button
+            type="button"
+            className="btn btn-secondary btn-sm"
+            onClick={() => setActiveModal('scan')}
+            disabled={!activeAnchor}
+            style={{ minHeight: '36px', padding: '0 12px', fontSize: '0.8125rem', display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+            title={tx('Scan businesses around selected location', 'Pindai prospek bisnis di sekitar titik terpilih')}
+          >
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 3v3M12 18v3M3 12h3M18 12h3"/><circle cx="12" cy="12" r="3"/></svg>
+            <span>{tx('Scan Area', 'Pindai Area')}</span>
+          </button>
 
           <button
             type="button"
@@ -1742,7 +1739,7 @@ export default function DashboardPage() {
                     Radius Pindai di Peta:
                   </label>
                   <div className="radius-pills">
-                    {[1, 2].map((r) => (
+                    {[1, 2, 5, 10].map((r) => (
                       <button
                         key={r}
                         type="button"
@@ -1750,6 +1747,7 @@ export default function DashboardPage() {
                         onClick={() => setCustomCandidate({ ...customCandidate, radiusKm: r })}
                         disabled={isSavingCustomPoint}
                         title={tx(`Radius ${r} km`, `Radius ${r} km`)}
+                        style={{ minHeight: '36px', minWidth: '44px' }}
                       >
                         {r} km
                       </button>
@@ -3283,8 +3281,14 @@ export default function DashboardPage() {
         <ScanModal
           anchors={anchors}
           activeAnchor={activeAnchor}
+          initialRadius={radiusKm}
           onClose={() => setActiveModal(null)}
-          onScanComplete={handleRefresh}
+          onScanComplete={(scanData) => {
+            if (scanData?.radiusKm) {
+              setRadiusKm(Number(scanData.radiusKm));
+            }
+            handleRefresh();
+          }}
         />
       )}
 
