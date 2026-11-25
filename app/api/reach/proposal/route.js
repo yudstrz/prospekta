@@ -3,6 +3,7 @@ import { db } from '@/lib/db';
 import { generateProposalDraft, generateAiColdEmail } from '@/lib/llm';
 import { sessionFromRequest } from '@/lib/auth';
 import { getSettings, consumeTenantQuota } from '@/lib/tenant';
+import { getEmailGenerationStats, recordEmailGeneration } from '@/lib/email-gen-logs';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,9 +29,12 @@ export async function GET(request) {
     }
     sql += ` ORDER BY updated_at DESC LIMIT 1;`;
 
-    const res = await db.execute({ sql, args });
+    const [res, emailGenStats] = await Promise.all([
+      db.execute({ sql, args }),
+      getEmailGenerationStats({ tenantId: tid || 'tnt_master', placeId }).catch(() => null),
+    ]);
 
-    return NextResponse.json({ success: true, proposal: res.rows?.[0] || null });
+    return NextResponse.json({ success: true, proposal: res.rows?.[0] || null, emailGenStats });
   } catch (err) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
   }
@@ -48,13 +52,6 @@ export async function POST(request) {
     }
 
     if (tid) {
-      const tSettings = await getSettings(tid);
-      if (tSettings && tSettings.feat_ai_proposal === 0) {
-        return NextResponse.json(
-          { success: false, error: 'Modul AI Proposal sedang dinonaktifkan. Anda dapat mengaktifkannya di menu Pengaturan Akun & Fitur > Fitur & Otomasi.' },
-          { status: 403 }
-        );
-      }
       await consumeTenantQuota(tid, 'ai');
     }
 
@@ -86,6 +83,7 @@ export async function POST(request) {
 
     if (body.action === 'ai_email') {
       const tSettings = tid ? await getSettings(tid).catch(() => null) : null;
+      const targetLang = lang === 'id' ? 'id' : 'en';
       const email = await generateAiColdEmail({
         companyName: place.name,
         category: place.bidang_usaha || place.category_raw || 'Umum',
@@ -93,18 +91,31 @@ export async function POST(request) {
         dmTitle: body.dmTitle || place.pic_title || '',
         analysis: rawAnalysis || {},
         place,
-        lang: lang === 'id' ? 'id' : 'en',
+        lang: targetLang,
         websiteCondition: body.websiteCondition || place.website_condition || null,
         offerAngle: body.offerAngle || place.offer_angle || null,
         location: body.location || place.city || '',
         tenantCompany: tSettings?.company_name || session?.company_name || '',
+        tenantLocation: tSettings?.address || '',
         tenantSenderName: tSettings?.smtp_from || session?.displayName || session?.email || '',
         tenantSenderEmail: tSettings?.gmail_mcp_account || tSettings?.smtp_user || session?.email || '',
         isClient: Boolean(tid && tid !== 'tnt_master'),
         tenantId: tid,
         userId: session?.uid || null,
+        regenerate: Boolean(body.regenerate),
+        variationIndex: Number(body.variationIndex) || 1,
       });
-      return NextResponse.json({ success: true, email });
+      const emailGenStats = await recordEmailGeneration({
+        tenantId: tid || 'tnt_master',
+        userId: session?.uid || null,
+        placeId,
+        companyName: place.name,
+        lang: targetLang,
+        provider: email?.provider || 'synthesis',
+        subject: email?.subject || '',
+        body: email?.body || '',
+      }).catch(() => null);
+      return NextResponse.json({ success: true, email, emailGenStats });
     }
 
     if (!rawAnalysis) {

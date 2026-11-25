@@ -53,6 +53,8 @@ export default function CompanyCrawlerModal({
   // 3. Execution & Results State
   const [isRunning, setIsRunning] = useState(false);
   const [results, setResults] = useState([]);
+  const [resultsPage, setResultsPage] = useState(1);
+  const [urlFilter, setUrlFilter] = useState('');
   const [queueCount, setQueueCount] = useState(0);
   const [visitedCount, setVisitedCount] = useState(0);
   const [statusMsg, setStatusMsg] = useState('Siap memindai.');
@@ -275,23 +277,30 @@ export default function CompanyCrawlerModal({
   const handleApplyToOffering = async () => {
     if (results.length === 0) return;
 
-    // Kumpulkan poin penting dari halaman-halaman yang dirayapi
-    const keyPoints = [];
+    const cleanBullets = [];
     results.forEach((p) => {
-      const cleanTitle = (p.title || '').replace(/\s*[-|]\s*.*$/, '').trim();
-      if (cleanTitle && cleanTitle.length > 3 && !keyPoints.includes(cleanTitle)) {
-        keyPoints.push(cleanTitle);
+      const cleanTitle = (p.title || '').replace(/\s*[-|]\s*.*$/, '').replace(/\s+/g, ' ').trim();
+      if (cleanTitle && cleanTitle.length > 3 && !cleanBullets.includes(cleanTitle)) {
+        cleanBullets.push(cleanTitle);
       }
     });
 
-    const descriptions = results
-      .map((p) => p.description)
-      .filter((d) => d && d.length > 20)
-      .slice(0, 3)
-      .join(' ');
+    const descPoints = [];
+    results.forEach((p) => {
+      const d = (p.description || '').replace(/\s+/g, ' ').trim();
+      if (d && d.length > 25 && !descPoints.some((existing) => existing.includes(d.slice(0, 40)))) {
+        descPoints.push(d);
+      }
+    });
 
-    const summary = keyPoints.slice(0, 6).join(', ');
-    const compiledText = `Layanan dan fokus solusi: ${summary}.${descriptions ? ' ' + descriptions : ''}`;
+    const parts = [];
+    if (cleanBullets.length > 0) {
+      parts.push(`Layanan & Fokus Solusi:\n${cleanBullets.slice(0, 7).map((item) => `- ${item}`).join('\n')}`);
+    }
+    if (descPoints.length > 0) {
+      parts.push(`Ringkasan Penawaran:\n${descPoints.slice(0, 3).map((d, i) => `${i + 1}. ${d}`).join('\n')}`);
+    }
+    const compiledText = parts.join('\n\n') || 'Profil layanan perusahaan hasil ekstraksi website.';
 
     // Callback ke parent
     if (onApplyToProfile) {
@@ -973,42 +982,141 @@ export default function CompanyCrawlerModal({
             </div>
           )}
 
-          {/* Results preview */}
-          {results.length > 0 && (
-            <div style={{ border: '1px solid var(--border-subtle, #e2e8f0)', borderRadius: '6px', overflow: 'hidden' }}>
-              <div style={{ padding: '8px 12px', backgroundColor: 'var(--bg-card-subtle, #f1f5f9)', fontSize: '0.78rem', fontWeight: 600, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <span>Daftar Halaman Berhasil Dirayapi ({results.length})</span>
-                <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>Siap diterapkan ke profil bisnis</span>
-              </div>
-              <div style={{ maxHeight: '220px', overflowY: 'auto' }}>
-                {results.map((r, i) => {
-                  let host = '';
-                  try {
-                    host = new URL(r.url).hostname;
-                  } catch (_) {}
+          {/* Results preview with filter & pagination */}
+          {results.length > 0 && (() => {
+            const RESULTS_PER_PAGE = 5;
+            const query = urlFilter.trim().toLowerCase();
+            const filtered = query
+              ? results.filter((r) => (r.url || '').toLowerCase().includes(query) || (r.title || '').toLowerCase().includes(query))
+              : results;
+            const totalPages = Math.max(1, Math.ceil(filtered.length / RESULTS_PER_PAGE));
+            const currentPage = Math.min(resultsPage, totalPages);
+            const startIdx = (currentPage - 1) * RESULTS_PER_PAGE;
+            const pageItems = filtered.slice(startIdx, startIdx + RESULTS_PER_PAGE);
 
-                  return (
-                    <div key={i} style={{ padding: '8px 12px', borderBottom: '1px solid var(--border-subtle, #f1f5f9)', fontSize: '0.75rem' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                        <span style={{ fontWeight: 600, color: 'var(--text-main, #0f172a)' }}>
-                          {i + 1}. {r.title || 'Halaman Tanpa Judul'}
-                        </span>
-                        {host && (
-                          <span style={{ fontSize: '0.65rem', padding: '0 4px', borderRadius: '3px', backgroundColor: '#e0f2fe', color: '#0369a1' }}>
-                            {host}
-                          </span>
-                        )}
-                      </div>
-                      <div style={{ color: '#0284c7', fontSize: '0.7rem', marginTop: '2px' }}>{r.url}</div>
-                      {r.description && (
-                        <div style={{ color: 'var(--text-muted, #64748b)', marginTop: '2px' }}>{r.description}</div>
-                      )}
+            return (
+              <div style={{ border: '1px solid var(--border-subtle)', borderRadius: '8px', overflow: 'hidden', backgroundColor: 'var(--bg-app)' }}>
+                <div style={{ padding: '10px 12px', backgroundColor: 'var(--bg-card-subtle)', borderBottom: '1px solid var(--border-subtle)', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
+                  <div>
+                    <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                      Daftar URL Berhasil Dirayapi ({filtered.length}{query ? ` dari ${results.length}` : ''})
                     </div>
-                  );
-                })}
+                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                      Menampilkan {filtered.length === 0 ? 0 : startIdx + 1}-{Math.min(startIdx + RESULTS_PER_PAGE, filtered.length)} dari {filtered.length} halaman (Hal. {currentPage}/{totalPages})
+                    </div>
+                  </div>
+                  <input
+                    type="search"
+                    value={urlFilter}
+                    onChange={(e) => { setUrlFilter(e.target.value); setResultsPage(1); }}
+                    placeholder="Filter URL atau judul..."
+                    aria-label="Filter daftar URL hasil crawling"
+                    style={{
+                      minHeight: '34px',
+                      padding: '4px 10px',
+                      fontSize: '0.75rem',
+                      borderRadius: '6px',
+                      border: '1px solid var(--border-subtle)',
+                      backgroundColor: 'var(--bg-app)',
+                      color: 'var(--text-main)',
+                      minWidth: '190px',
+                    }}
+                  />
+                </div>
+
+                <div>
+                  {pageItems.length === 0 ? (
+                    <div style={{ padding: '16px 12px', textAlign: 'center', fontSize: '0.78rem', color: 'var(--text-muted)' }}>
+                      Tidak ada URL yang cocok dengan pencarian &ldquo;{urlFilter}&rdquo;.
+                    </div>
+                  ) : (
+                    pageItems.map((r, i) => {
+                      const itemNum = startIdx + i + 1;
+                      let host = '';
+                      try { host = new URL(r.url).hostname; } catch (_) {}
+                      return (
+                        <div key={`${r.url}_${itemNum}`} style={{ padding: '10px 12px', borderBottom: '1px solid var(--border-subtle)', fontSize: '0.75rem', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+                            <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>
+                              {itemNum}. {r.title || 'Halaman Tanpa Judul'}
+                            </span>
+                            {host && (
+                              <span style={{ fontSize: '0.68rem', padding: '1px 6px', borderRadius: '4px', backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-subtle)', color: 'var(--text-muted)' }}>
+                                {host}
+                              </span>
+                            )}
+                          </div>
+                          <a
+                            href={r.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            style={{ color: 'var(--accent-text)', fontSize: '0.72rem', wordBreak: 'break-all', textDecoration: 'underline' }}
+                          >
+                            {r.url}
+                          </a>
+                          {r.description && (
+                            <div style={{ color: 'var(--text-muted)', lineHeight: 1.4 }}>{r.description}</div>
+                          )}
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {totalPages > 1 && (
+                  <div style={{ padding: '8px 12px', backgroundColor: 'var(--bg-card-subtle)', borderTop: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      disabled={currentPage <= 1}
+                      onClick={() => setResultsPage((p) => Math.max(1, p - 1))}
+                      style={{ minHeight: '36px', fontSize: '0.75rem' }}
+                    >
+                      &laquo; Sebelumnya
+                    </button>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px', flexWrap: 'wrap' }}>
+                      {Array.from({ length: totalPages }, (_, idx) => idx + 1)
+                        .filter((p) => p === 1 || p === totalPages || Math.abs(p - currentPage) <= 1)
+                        .map((p, idx, arr) => (
+                          <span key={p} style={{ display: 'inline-flex', alignItems: 'center', gap: '4px' }}>
+                            {idx > 0 && arr[idx - 1] !== p - 1 && (
+                              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', padding: '0 2px' }}>...</span>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => setResultsPage(p)}
+                              style={{
+                                minHeight: '34px',
+                                minWidth: '34px',
+                                padding: '0 8px',
+                                fontSize: '0.75rem',
+                                fontWeight: p === currentPage ? 700 : 500,
+                                borderRadius: '6px',
+                                border: p === currentPage ? '1px solid var(--primary)' : '1px solid var(--border-subtle)',
+                                backgroundColor: p === currentPage ? 'var(--primary)' : 'var(--bg-app)',
+                                color: p === currentPage ? '#ffffff' : 'var(--text-main)',
+                                cursor: 'pointer',
+                              }}
+                            >
+                              {p}
+                            </button>
+                          </span>
+                        ))}
+                    </div>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      disabled={currentPage >= totalPages}
+                      onClick={() => setResultsPage((p) => Math.min(totalPages, p + 1))}
+                      style={{ minHeight: '36px', fontSize: '0.75rem' }}
+                    >
+                      Berikutnya &raquo;
+                    </button>
+                  </div>
+                )}
               </div>
-            </div>
-          )}
+            );
+          })()}
         </div>
 
         {/* Modal Footer */}

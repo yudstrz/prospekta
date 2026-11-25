@@ -150,13 +150,6 @@ export async function POST(request) {
     }
 
     if (tid) {
-      const tSettings = await getSettings(tid);
-      if (tSettings && tSettings.feat_prebuilt_site === 0) {
-        return NextResponse.json(
-          { success: false, error: 'Modul Website Demo (Prebuilt Sites) sedang dinonaktifkan. Anda dapat mengaktifkannya di menu Pengaturan Akun & Fitur > Fitur & Otomasi.' },
-          { status: 403 }
-        );
-      }
       await consumeTenantQuota(tid, 'ai');
     }
 

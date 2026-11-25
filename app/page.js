@@ -1233,115 +1233,211 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {isProfileSummaryExpanded && (
-          <div
-            style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 260px), 1fr))',
-              gap: '0.75rem',
-              paddingTop: '0.75rem',
-              borderTop: '1px solid var(--border-subtle)',
-              fontSize: '0.8125rem',
-            }}
-          >
-            {/* Kolom 1: Produk & Solusi Utama */}
-            <div style={{ backgroundColor: 'var(--bg-app)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-              <div style={{ fontWeight: 600, color: 'var(--text-main)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
-                <span>{tx('Core Product / Offering:', 'Produk & Solusi Utama:')}</span>
-              </div>
-              <div style={{ color: tenantSettings?.company_offering ? 'var(--text-main)' : 'var(--text-muted)', lineHeight: 1.5, fontSize: '0.78rem' }}>
-                {tenantSettings?.company_offering
-                  ? tenantSettings.company_offering
-                  : tx('Not configured yet. AI will use general templates until offering details are provided.', 'Belum diisi. Klik "Edit Profil" atau "Perayap Website" agar AI dapat menuliskan proposal yang akurat.')}
-              </div>
-            </div>
+        {isProfileSummaryExpanded && (() => {
+          let parsedPdfs = [];
+          try {
+            const p = tenantSettings?.company_pdfs ? JSON.parse(tenantSettings.company_pdfs) : [];
+            if (Array.isArray(p)) parsedPdfs = p;
+          } catch (_) {}
 
-            {/* Kolom 2: Target Audience & Jangkauan */}
-            <div style={{ backgroundColor: 'var(--bg-app)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-              <div style={{ fontWeight: 600, color: 'var(--text-main)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
-                <span>{tx('Target Decision Makers:', 'Target Pengambil Keputusan:')}</span>
-              </div>
-              <div style={{ color: tenantSettings?.target_audience ? 'var(--text-main)' : 'var(--text-muted)', lineHeight: 1.5, fontSize: '0.78rem', marginBottom: '8px' }}>
-                {tenantSettings?.target_audience
-                  ? tenantSettings.target_audience
-                  : tx('Default: Business Owners, Managing Directors, Operations Heads.', 'Bawaan: Pemilik Usaha, Direktur Operasional, Manajer HRD / IT.')}
-              </div>
+          const renderFormattedOffering = (rawText) => {
+            const raw = String(rawText || '').trim();
+            if (!raw) return null;
+            const hasNewlines = raw.includes('\n');
+            const normalized = hasNewlines
+              ? raw
+              : raw
+                  .replace(/(Layanan dan fokus solusi:|Portofolio[^:]*:|Kontak[^:]*:|Ringkasan Penawaran:)/gi, '\n\n$1\n')
+                  .replace(/\.\s+(?=[A-Z])/g, '.\n\n');
+            const lines = normalized.split('\n').map((l) => l.trim()).filter(Boolean);
 
-              <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
-                <span>Bahasa:</span>
-                <span style={{ fontWeight: 600, color: 'var(--text-main)', textTransform: 'capitalize' }}>
-                  {tenantSettings?.email_language || 'Otomatis (ID/EN)'}
-                </span>
-                <span>&bull;</span>
-                <span>Radius Bawaan:</span>
-                <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>
-                  {tenantSettings?.default_radius_km || 2} km
-                </span>
-              </div>
-            </div>
+            const blocks = [];
+            let currentList = null;
+            lines.forEach((line) => {
+              const bulletMatch = line.match(/^[-*\u2022]\s+(.*)$/);
+              const numMatch = line.match(/^(\d+)[.)]\s+(.*)$/);
+              if (bulletMatch) {
+                if (!currentList || currentList.type !== 'ul') {
+                  currentList = { type: 'ul', items: [] };
+                  blocks.push(currentList);
+                }
+                currentList.items.push(bulletMatch[1]);
+              } else if (numMatch) {
+                if (!currentList || currentList.type !== 'ol') {
+                  currentList = { type: 'ol', items: [] };
+                  blocks.push(currentList);
+                }
+                currentList.items.push(numMatch[2]);
+              } else {
+                currentList = null;
+                blocks.push({ type: line.endsWith(':') && line.length < 60 ? 'heading' : 'p', text: line });
+              }
+            });
 
-            {/* Kolom 3: Tautan Website & Domain Aktif */}
-            <div style={{ backgroundColor: 'var(--bg-app)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
-                <div style={{ fontWeight: 600, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
-                  <span>{tx('Registered Websites & Domains:', 'Tautan Website & Domain:')}</span>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => setIsCrawlerOpen(true)}
-                  style={{ background: 'none', border: 'none', color: 'var(--accent-text)', fontSize: '0.72rem', cursor: 'pointer', minHeight: '34px', padding: '0 6px', fontWeight: 600 }}
-                >
-                  + Kelola Tautan
-                </button>
-              </div>
-
-              <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '80px', overflowY: 'auto' }}>
-                {(() => {
-                  let parsed = [];
-                  try {
-                    parsed = tenantSettings?.company_urls ? JSON.parse(tenantSettings.company_urls) : [];
-                  } catch (_) {}
-
-                  if (!Array.isArray(parsed) || parsed.length === 0) {
+            return (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '6px', fontSize: '0.78rem', lineHeight: 1.55, color: 'var(--text-main)' }}>
+                {blocks.map((b, idx) => {
+                  if (b.type === 'ul') {
                     return (
-                      <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                        <a href="https://prospekta.id" target="_blank" rel="noreferrer" style={{ color: 'var(--primary)' }}>
-                          https://prospekta.id
-                        </a>
-                        <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginLeft: '6px' }}>(Bawaan Workspace)</span>
-                      </div>
+                      <ul key={idx} style={{ margin: '2px 0', paddingLeft: '1.15rem', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                        {b.items.map((it, i) => <li key={i}>{it}</li>)}
+                      </ul>
                     );
                   }
+                  if (b.type === 'ol') {
+                    return (
+                      <ol key={idx} style={{ margin: '2px 0', paddingLeft: '1.25rem', display: 'flex', flexDirection: 'column', gap: '3px' }}>
+                        {b.items.map((it, i) => <li key={i}>{it}</li>)}
+                      </ol>
+                    );
+                  }
+                  if (b.type === 'heading') {
+                    return <div key={idx} style={{ fontWeight: 700, color: 'var(--text-main)', marginTop: idx > 0 ? '4px' : 0 }}>{b.text}</div>;
+                  }
+                  return <p key={idx} style={{ margin: 0, color: 'var(--text-main)' }}>{b.text}</p>;
+                })}
+              </div>
+            );
+          };
 
-                  return parsed.map((item) => (
-                    <div key={item.id || item.url} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', fontSize: '0.72rem' }}>
-                      <span style={{ fontWeight: 600, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {item.label}
-                      </span>
-                      <a
-                        href={item.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{ color: 'var(--primary)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '160px' }}
-                      >
-                        {item.url}
-                      </a>
-                    </div>
-                  ));
-                })()}
+          return (
+            <div
+              style={{
+                display: 'grid',
+                gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 300px), 1fr))',
+                gap: '0.75rem',
+                paddingTop: '0.75rem',
+                borderTop: '1px solid var(--border-subtle)',
+                fontSize: '0.8125rem',
+              }}
+            >
+              {/* Kolom Kiri: Produk & Solusi Utama Terstruktur */}
+              <div style={{ backgroundColor: 'var(--bg-app)', padding: '0.875rem', borderRadius: '8px', border: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ fontWeight: 600, color: 'var(--text-main)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><path d="m9 12 2 2 4-4"/></svg>
+                    <span>{tx('Core Product / Offering:', 'Produk & Solusi Utama:')}</span>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveModal('tenant_settings')}
+                    style={{ background: 'none', border: 'none', color: 'var(--accent-text)', fontSize: '0.72rem', cursor: 'pointer', padding: '0 4px', fontWeight: 600 }}
+                  >
+                    {tx('Edit Text', 'Ubah Teks')}
+                  </button>
+                </div>
+                <div style={{ maxHeight: '220px', overflowY: 'auto', paddingRight: '4px' }}>
+                  {tenantSettings?.company_offering
+                    ? renderFormattedOffering(tenantSettings.company_offering)
+                    : (
+                      <div style={{ color: 'var(--text-muted)', lineHeight: 1.5, fontSize: '0.78rem' }}>
+                        {tx('Not configured yet. AI will use general templates until offering details are provided.', 'Belum diisi. Klik "Edit Profil" atau "Perayap Website" agar AI dapat menuliskan proposal yang akurat.')}
+                      </div>
+                    )}
+                </div>
               </div>
 
-              {tenantSettings?.crawl_domains && (
-                <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)', marginTop: '4px', paddingTop: '4px', borderTop: '1px dashed var(--border-subtle)' }}>
-                  Domain terkait: {tenantSettings.crawl_domains}
+              {/* Kolom Kanan: Target, Website & Dokumen PDF */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
+                <div style={{ backgroundColor: 'var(--bg-app)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+                  <div style={{ fontWeight: 600, color: 'var(--text-main)', marginBottom: '4px', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M22 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    <span>{tx('Target Decision Makers:', 'Target Pengambil Keputusan:')}</span>
+                  </div>
+                  <div style={{ color: tenantSettings?.target_audience ? 'var(--text-main)' : 'var(--text-muted)', lineHeight: 1.5, fontSize: '0.78rem', marginBottom: '6px' }}>
+                    {tenantSettings?.target_audience
+                      ? tenantSettings.target_audience
+                      : tx('Default: Business Owners, Managing Directors, Operations Heads.', 'Bawaan: Pemilik Usaha, Direktur Operasional, Manajer HRD / IT.')}
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                    <span>Bahasa:</span>
+                    <span style={{ fontWeight: 600, color: 'var(--text-main)', textTransform: 'capitalize' }}>
+                      {tenantSettings?.email_language || 'Otomatis (ID/EN)'}
+                    </span>
+                    <span>&bull;</span>
+                    <span>Radius Bawaan:</span>
+                    <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>
+                      {tenantSettings?.default_radius_km || 2} km
+                    </span>
+                  </div>
                 </div>
-              )}
+
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(min(100%, 210px), 1fr))', gap: '0.75rem' }}>
+                  {/* Websites */}
+                  <div style={{ backgroundColor: 'var(--bg-app)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <div style={{ fontWeight: 600, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem' }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+                        <span>{tx('Websites & Domains', 'Website & Domain')}</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsCrawlerOpen(true)}
+                        style={{ background: 'none', border: 'none', color: 'var(--accent-text)', fontSize: '0.7rem', cursor: 'pointer', minHeight: '30px', padding: '0 4px', fontWeight: 600 }}
+                      >
+                        + Kelola
+                      </button>
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '72px', overflowY: 'auto' }}>
+                      {(() => {
+                        let parsed = [];
+                        try {
+                          parsed = tenantSettings?.company_urls ? JSON.parse(tenantSettings.company_urls) : [];
+                        } catch (_) {}
+                        if (!Array.isArray(parsed) || parsed.length === 0) {
+                          return (
+                            <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                              <a href="https://prospekta.id" target="_blank" rel="noreferrer" style={{ color: 'var(--accent-text)' }}>https://prospekta.id</a>
+                            </div>
+                          );
+                        }
+                        return parsed.map((item) => (
+                          <div key={item.id || item.url} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', fontSize: '0.72rem' }}>
+                            <span style={{ fontWeight: 600, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{item.label}</span>
+                            <a href={item.url} target="_blank" rel="noreferrer" style={{ color: 'var(--accent-text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: '130px' }}>
+                              {item.url}
+                            </a>
+                          </div>
+                        ));
+                      })()}
+                    </div>
+                  </div>
+
+                  {/* Company PDFs */}
+                  <div style={{ backgroundColor: 'var(--bg-app)', padding: '0.75rem', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <div style={{ fontWeight: 600, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px', fontSize: '0.78rem' }}>
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                        <span>{tx('PDF Knowledge', 'Dokumen PDF')} ({parsedPdfs.length})</span>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setActiveModal('tenant_settings')}
+                        style={{ background: 'none', border: 'none', color: 'var(--accent-text)', fontSize: '0.7rem', cursor: 'pointer', minHeight: '30px', padding: '0 4px', fontWeight: 600 }}
+                      >
+                        + Tambah PDF
+                      </button>
+                    </div>
+                    {parsedPdfs.length === 0 ? (
+                      <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
+                        {tx('No company PDFs yet. Upload in Profile Settings.', 'Belum ada PDF. Unggah brosur/profil di Edit Profil.')}
+                      </div>
+                    ) : (
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: '4px', maxHeight: '72px', overflowY: 'auto' }}>
+                        {parsedPdfs.map((doc) => (
+                          <div key={doc.id} style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px', fontSize: '0.72rem' }}>
+                            <span style={{ fontWeight: 600, color: 'var(--text-main)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{doc.title || doc.name}</span>
+                            <span style={{ fontSize: '0.68rem', color: 'var(--text-muted)', flexShrink: 0 }}>{doc.pages || 1} hal</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
-          </div>
-        )}
+          );
+        })()}
       </section>
 
       {/* Control Panel: Anchors, Radius & Map Toggle */}

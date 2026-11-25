@@ -265,6 +265,64 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
     }));
   };
 
+  const parsedCompanyPdfs = (() => {
+    try {
+      const list = settings.company_pdfs ? JSON.parse(settings.company_pdfs) : [];
+      return Array.isArray(list) ? list : [];
+    } catch (_) {
+      return [];
+    }
+  })();
+
+  const handleUploadCompanyPdf = async (e) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setPdfUploading(true);
+    setPdfError(null);
+    setPdfSuccess(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      const url = tenantId ? `/api/company-pdf?tenant_id=${encodeURIComponent(tenantId)}` : '/api/company-pdf';
+      const res = await fetch(url, { method: 'POST', body: fd });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Gagal mengunggah PDF.');
+      }
+      setSettings((prev) => ({ ...prev, ...data.settings }));
+      if (onSuccess) onSuccess(data.settings);
+      setPdfSuccess(`PDF "${data.pdf?.name || file.name}" berhasil diekstrak (${data.pdf?.pages || 1} hal, ${(data.pdf?.chars || 0).toLocaleString('id-ID')} karakter).`);
+    } catch (err) {
+      setPdfError(err.message);
+    } finally {
+      setPdfUploading(false);
+      if (pdfInputRef.current) pdfInputRef.current.value = '';
+    }
+  };
+
+  const handleDeleteCompanyPdf = async (pdfId, name) => {
+    if (!pdfId || !confirm(`Hapus dokumen PDF "${name || 'ini'}" dari Knowledge Base AI?`)) return;
+    setPdfUploading(true);
+    setPdfError(null);
+    setPdfSuccess(null);
+    try {
+      const base = `/api/company-pdf?id=${encodeURIComponent(pdfId)}`;
+      const url = tenantId ? `${base}&tenant_id=${encodeURIComponent(tenantId)}` : base;
+      const res = await fetch(url, { method: 'DELETE' });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Gagal menghapus PDF.');
+      }
+      setSettings((prev) => ({ ...prev, ...data.settings }));
+      if (onSuccess) onSuccess(data.settings);
+      setPdfSuccess(`Dokumen "${name}" telah dihapus.`);
+    } catch (err) {
+      setPdfError(err.message);
+    } finally {
+      setPdfUploading(false);
+    }
+  };
+
   const navTabStyle = (tabKey) => ({
     padding: '0.55rem 0.85rem',
     background: 'none',
@@ -277,6 +335,11 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
     whiteSpace: 'nowrap',
   });
 
+  const [pdfUploading, setPdfUploading] = useState(false);
+  const [pdfError, setPdfError] = useState(null);
+  const [pdfSuccess, setPdfSuccess] = useState(null);
+  const [expandedPdfId, setExpandedPdfId] = useState(null);
+  const pdfInputRef = useRef(null);
   const isBackdropClickRef = useRef(false);
 
   const handleMouseDown = (e) => {
@@ -568,6 +631,155 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                       <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>
                         Cakupan Domain: {settings.crawl_scope || 'subdomain'} {settings.crawl_domains ? `| Domain Saudara: ${settings.crawl_domains}` : ''}
                       </span>
+                    </div>
+
+                    {/* Dokumen PDF Perusahaan (Knowledge Base AI) */}
+                    <div
+                      style={{
+                        marginTop: '4px',
+                        padding: '12px',
+                        borderRadius: '8px',
+                        border: '1px solid var(--border-subtle)',
+                        backgroundColor: 'var(--bg-app)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '10px',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                        <div>
+                          <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                            Dokumen PDF Perusahaan (Knowledge Base AI)
+                          </div>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                            Unggah company profile, brosur layanan, atau daftar harga (.pdf, maks. 4 MB) agar dipelajari AI saat menulis email &amp; proposal.
+                          </div>
+                        </div>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                          <input
+                            ref={pdfInputRef}
+                            type="file"
+                            accept="application/pdf,.pdf"
+                            onChange={handleUploadCompanyPdf}
+                            style={{ display: 'none' }}
+                            id="company-pdf-upload-input"
+                          />
+                          <button
+                            type="button"
+                            className="btn btn-secondary btn-sm"
+                            disabled={pdfUploading}
+                            onClick={() => pdfInputRef.current?.click()}
+                            style={{
+                              minHeight: '38px',
+                              padding: '0 12px',
+                              fontSize: '0.78rem',
+                              fontWeight: 600,
+                              color: 'var(--accent-text)',
+                              display: 'inline-flex',
+                              alignItems: 'center',
+                              gap: '6px',
+                            }}
+                          >
+                            {pdfUploading ? 'Memproses PDF...' : '+ Tambah PDF'}
+                          </button>
+                        </div>
+                      </div>
+
+                      {pdfError && (
+                        <div className="alert alert-danger" style={{ margin: 0, fontSize: '0.75rem', padding: '8px 10px' }}>
+                          {pdfError}
+                        </div>
+                      )}
+                      {pdfSuccess && (
+                        <div className="alert alert-success" style={{ margin: 0, fontSize: '0.75rem', padding: '8px 10px' }}>
+                          {pdfSuccess}
+                        </div>
+                      )}
+
+                      {parsedCompanyPdfs.length === 0 ? (
+                        <div
+                          style={{
+                            padding: '12px',
+                            borderRadius: '6px',
+                            border: '1px dashed var(--border-subtle)',
+                            fontSize: '0.75rem',
+                            color: 'var(--text-muted)',
+                            textAlign: 'center',
+                          }}
+                        >
+                          Belum ada dokumen PDF diunggah. Klik &ldquo;+ Tambah PDF&rdquo; untuk melatih AI dengan materi internal perusahaan Anda.
+                        </div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                          {parsedCompanyPdfs.map((doc) => {
+                            const isExpanded = expandedPdfId === doc.id;
+                            const sizeKb = Math.max(1, Math.round((doc.sizeBytes || 0) / 1024));
+                            return (
+                              <div
+                                key={doc.id}
+                                style={{
+                                  padding: '10px 12px',
+                                  borderRadius: '6px',
+                                  border: '1px solid var(--border-subtle)',
+                                  backgroundColor: 'var(--bg-card)',
+                                  display: 'flex',
+                                  flexDirection: 'column',
+                                  gap: '6px',
+                                }}
+                              >
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap' }}>
+                                  <div style={{ minWidth: 0, flex: 1 }}>
+                                    <div style={{ fontSize: '0.8rem', fontWeight: 600, color: 'var(--text-main)', wordBreak: 'break-word' }}>
+                                      {doc.title || doc.name}
+                                    </div>
+                                    <div style={{ fontSize: '0.7rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                                      {doc.name} &bull; {doc.pages || 1} hal &bull; {(doc.chars || 0).toLocaleString('id-ID')} karakter &bull; {sizeKb} KB
+                                    </div>
+                                  </div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexShrink: 0 }}>
+                                    {doc.excerpt && (
+                                      <button
+                                        type="button"
+                                        className="btn btn-secondary btn-xs"
+                                        onClick={() => setExpandedPdfId(isExpanded ? null : doc.id)}
+                                        style={{ minHeight: '34px', fontSize: '0.72rem', padding: '0 8px' }}
+                                      >
+                                        {isExpanded ? 'Tutup Cuplikan' : 'Lihat Teks'}
+                                      </button>
+                                    )}
+                                    <button
+                                      type="button"
+                                      className="btn btn-secondary btn-xs"
+                                      disabled={pdfUploading}
+                                      onClick={() => handleDeleteCompanyPdf(doc.id, doc.name)}
+                                      style={{ minHeight: '34px', fontSize: '0.72rem', padding: '0 8px', color: 'var(--danger-text, #ef4444)' }}
+                                    >
+                                      Hapus
+                                    </button>
+                                  </div>
+                                </div>
+                                {isExpanded && doc.excerpt && (
+                                  <div
+                                    style={{
+                                      padding: '8px 10px',
+                                      borderRadius: '6px',
+                                      backgroundColor: 'var(--bg-app)',
+                                      border: '1px solid var(--border-subtle)',
+                                      fontSize: '0.72rem',
+                                      color: 'var(--text-muted)',
+                                      lineHeight: 1.5,
+                                      whiteSpace: 'pre-line',
+                                    }}
+                                  >
+                                    {doc.excerpt}...
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
+                        </div>
+                      )}
                     </div>
 
                     <div>

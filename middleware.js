@@ -27,6 +27,7 @@ const CLIENT_ROUTES = [
   '/api/enrich',
   '/api/sync/',
   '/api/crawl',
+  '/api/company-pdf',
   '/api/ai-settings',
   '/api/ai-chat',
 ];

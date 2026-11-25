@@ -34,16 +34,24 @@ const buildSgExecutiveEmail = ({
   manualSubjectTemplate = '',
   manualBodyTemplate = '',
 } = {}) => {
-  const greeting = dmName ? `Halo ${dmName},` : (lang === 'en' ? `Hi ${companyName || 'Team'},` : `Halo tim ${companyName || ''},`);
-  const offer = companyOffering ? companyOffering.slice(0, 140) : (lang === 'en' ? 'practical website and digital workflow updates' : 'penataan website dan alur komunikasi digital');
-  const previewLine = includePreviewLink && previewUrl ? `\nContoh konsep awal untuk ${companyName}: ${previewUrl}` : '';
-  const ctaLine = customCta || (lang === 'en' ? 'Open to a brief 10-minute chat this week?' : 'Bolehkah kami kirim ringkasan singkatnya minggu ini?');
+  const greeting = dmName
+    ? (lang === 'en' ? `Hi ${dmName},` : `Halo ${dmName},`)
+    : (lang === 'en' ? `Hi ${companyName || 'Team'},` : `Halo tim ${companyName || ''},`);
+  const offer = companyOffering
+    ? companyOffering.split('\n')[0].replace(/^Layanan[^:]*:\s*/i, '').slice(0, 120)
+    : (lang === 'en' ? 'modern client intake and web showcase solutions' : 'penataan website dan alur komunikasi digital');
+  const previewLine = includePreviewLink && previewUrl
+    ? (lang === 'en' ? `\nInteractive preview for ${companyName}: ${previewUrl}` : `\nContoh konsep awal untuk ${companyName}: ${previewUrl}`)
+    : '';
+  const ctaLine = customCta || (lang === 'en' ? 'Would you be open to a quick 10-minute look this week?' : 'Bolehkah kami kirim ringkasan singkatnya minggu ini?');
   const subject = manualSubjectTemplate
     ? manualSubjectTemplate.replace(/\{\{company\}\}/gi, companyName)
     : (lang === 'en' ? `Quick note for ${companyName || 'your team'}` : `Singkat untuk tim ${companyName || 'Anda'}`);
   const body = manualBodyTemplate
     ? manualBodyTemplate.replace(/\{\{company\}\}/gi, companyName)
-    : `${greeting}\n\nSaya ${senderName} dari ${senderCompany}${location ? ` (${location})` : ''}. Kami membantu bisnis sejenis dalam ${offer}.${previewLine}\n\n${ctaLine}\n\nTerima kasih,\n${senderName}`;
+    : (lang === 'en'
+        ? `${greeting}\n\nI'm ${senderName} from ${senderCompany}${location ? ` (${location})` : ''}. We help businesses in your sector with ${offer}.${previewLine}\n\n${ctaLine}\n\nBest regards,\n${senderName}`
+        : `${greeting}\n\nSaya ${senderName} dari ${senderCompany}${location ? ` (${location})` : ''}. Kami membantu bisnis sejenis dalam ${offer}.${previewLine}\n\n${ctaLine}\n\nTerima kasih,\n${senderName}`);
   return { subject, body, angle: 'digital_structure' };
 };
 const buildLinkedInMessages = ({ companyName = '', dmName = '', location = '', lang = 'id', senderName = 'Tim Bisnis', senderCompany = 'Prospekta' } = {}) => {
@@ -124,6 +132,9 @@ const IconCalendar = () => (
 );
 const IconMail = () => (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+);
+const IconSend = () => (
+  <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
 );
 const IconPhone = () => (
   <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
@@ -247,6 +258,10 @@ export default function ReachModal({ place: initialPlace, onClose, onUpdatePlace
   const [aiEmail, setAiEmail] = useState(null);
   const [aiEmailLoading, setAiEmailLoading] = useState(false);
   const [aiEmailError, setAiEmailError] = useState(null);
+  const [emailGenStats, setEmailGenStats] = useState(null);
+  const [draftSubject, setDraftSubject] = useState('');
+  const [draftBody, setDraftBody] = useState('');
+  const [showGenHistory, setShowGenHistory] = useState(false);
 
   // Research Notes State
   const [notes, setNotes] = useState([]);
@@ -347,12 +362,24 @@ export default function ReachModal({ place: initialPlace, onClose, onUpdatePlace
       .catch((err) => console.error('Failed to load notes:', err))
       .finally(() => setNotesLoading(false));
 
+    setEmailGenStats(null);
+    setShowGenHistory(false);
     fetch(`/api/reach/proposal?placeId=${place.overture_id}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.success && data.proposal) {
           setProposal(data.proposal);
           setProposalContent(data.proposal.content || '');
+        }
+        if (data.emailGenStats) {
+          setEmailGenStats(data.emailGenStats);
+          if (data.emailGenStats.latestEmail?.subject && data.emailGenStats.latestEmail?.body) {
+            setAiEmail(data.emailGenStats.latestEmail);
+            setEmailMode('ai');
+            if (data.emailGenStats.latestEmail.lang) {
+              setOutreachLang(data.emailGenStats.latestEmail.lang === 'id' ? 'id' : 'en');
+            }
+          }
         }
       })
       .catch((err) => console.error('Failed to load proposal:', err));
@@ -385,7 +412,7 @@ export default function ReachModal({ place: initialPlace, onClose, onUpdatePlace
   }, [place?.overture_id]);
 
   // Generate Prebuilt Dynamic Website Preview
-  const handleGeneratePrebuiltSite = async () => {
+  const handleGeneratePrebuiltSite = async (forceRegenerate = false) => {
     setPrebuiltLoading(true);
     setPrebuiltError(null);
     try {
@@ -394,7 +421,8 @@ export default function ReachModal({ place: initialPlace, onClose, onUpdatePlace
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           placeId: place.overture_id,
-          lang: outreachLang
+          lang: outreachLang,
+          force: Boolean(forceRegenerate === true)
         })
       });
       const data = await res.json();
@@ -644,6 +672,8 @@ export default function ReachModal({ place: initialPlace, onClose, onUpdatePlace
   const handleGenerateAiEmail = async (overrideLang, customOptions = {}) => {
     if (!place?.overture_id) return;
     const langToUse = overrideLang || outreachLang;
+    const isRegen = Boolean(customOptions.regenerate || aiEmail || (emailGenStats?.placeCount || 0) > 0);
+    const nextVariation = (emailGenStats?.placeCount || 0) + 1;
     setAiEmailLoading(true);
     setAiEmailError(null);
 
@@ -662,6 +692,8 @@ export default function ReachModal({ place: initialPlace, onClose, onUpdatePlace
           placeId: place.overture_id,
           analysisId: analysis?.id,
           lang: langToUse,
+          regenerate: isRegen,
+          variationIndex: nextVariation,
           dmName: customOptions.dmName !== undefined ? customOptions.dmName : (sgForm.dmName || place.pic_name),
           dmTitle: customOptions.dmTitle !== undefined ? customOptions.dmTitle : (sgForm.dmTitle || place.pic_title),
           websiteCondition: customOptions.websiteCondition || sgForm.websiteCondition,
@@ -674,7 +706,11 @@ export default function ReachModal({ place: initialPlace, onClose, onUpdatePlace
       if (!data.success) {
         throw new Error(data.error || 'Gagal merumuskan email AI.');
       }
-      setAiEmail(data.email);
+      setAiEmail({ ...(data.email || {}), lang: langToUse });
+      setEmailMode('ai');
+      if (data.emailGenStats) {
+        setEmailGenStats(data.emailGenStats);
+      }
     } catch (err) {
       console.warn('AI email generation error:', err);
       setAiEmailError(err.message);
@@ -1110,8 +1146,18 @@ export default function ReachModal({ place: initialPlace, onClose, onUpdatePlace
         ? `\n\nP.S. You can also pick a convenient 15-minute slot directly on our calendar: ${calendlyUrl}`
         : `\n\nP.S. Anda juga dapat langsung memilih jadwal diskusi 15 menit via kalender kami: ${calendlyUrl}`)
     : '';
+  const previewSuffix = (emailMode === 'ai' && includePreviewLink && prebuiltUrl)
+    ? (outreachLang === 'en'
+        ? `\n\nInteractive preview link for ${place.name}: ${prebuiltUrl}`
+        : `\n\nTautan contoh website preview untuk ${place.name}: ${prebuiltUrl}`)
+    : '';
   const baseEmailBody = (emailMode === 'ai' && aiEmail?.body) ? aiEmail.body : sgEmail.body;
-  const activeEmailBody = `${baseEmailBody}${calendlySuffix}`;
+  const activeEmailBody = `${baseEmailBody}${previewSuffix}${calendlySuffix}`;
+
+  useEffect(() => {
+    setDraftSubject(activeEmailSubject || '');
+    setDraftBody(activeEmailBody || '');
+  }, [activeEmailSubject, activeEmailBody]);
 
   const cleanInd = (place.bidang_usaha || place.category_raw || (outreachLang === 'id' ? 'industri Anda' : 'your industry')).replace(/_/g, ' ');
   const dmFirstName = (sgForm.dmName || place.pic_name || '').trim().split(' ')[0];
@@ -2080,9 +2126,20 @@ export default function ReachModal({ place: initialPlace, onClose, onUpdatePlace
                 {/* State 5: Analisis sudah ada */}
                 {!analysisChecking && !analysisRunning && analysis && (
                   <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
-                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                      {tx('Analyzed:', 'Dianalisis:')} {new Date(analysis.created_at).toLocaleDateString(lang === 'id' ? 'id-ID' : 'en-US')}
-                      {analysis.source_url ? ` (${analysis.source_url})` : ''}
+                    <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '6px' }}>
+                      <span>
+                        {tx('Analyzed:', 'Dianalisis:')} {new Date(analysis.created_at).toLocaleDateString(lang === 'id' ? 'id-ID' : 'en-US')}
+                      </span>
+                      {analysis.source_url && (
+                        <a
+                          href={analysis.source_url.startsWith('http') ? analysis.source_url : `https://${analysis.source_url}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ color: 'var(--accent-text)', textDecoration: 'underline', fontWeight: 600 }}
+                        >
+                          {analysis.source_url}
+                        </a>
+                      )}
                     </div>
 
                     {/* Ringkasan Bisnis */}
@@ -2090,83 +2147,137 @@ export default function ReachModal({ place: initialPlace, onClose, onUpdatePlace
                       <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.375rem' }}>
                         {tx('Operational Summary:', 'Ringkasan Operasional:')}
                       </div>
-                      <p style={{ fontSize: '0.875rem', color: 'var(--text-muted)', lineHeight: 1.6, margin: 0 }}>
+                      <p style={{ fontSize: '0.84rem', color: 'var(--text-muted)', lineHeight: 1.65, margin: 0, whiteSpace: 'pre-line' }}>
                         {analysis.summary}
                       </p>
+                      {analysis.products && (
+                        <div style={{ marginTop: '0.625rem', padding: '0.5rem 0.75rem', borderRadius: '6px', backgroundColor: 'var(--bg-app)', border: '1px solid var(--border-subtle)', fontSize: '0.78rem', color: 'var(--text-main)', lineHeight: 1.5 }}>
+                          <strong>{tx('Detected Products / Services:', 'Layanan & Aktivitas Terdeteksi:')}</strong>{' '}
+                          <span style={{ color: 'var(--text-muted)' }}>{analysis.products}</span>
+                        </div>
+                      )}
                     </div>
 
-                    {/* Needs with Evidence - Verified Facts Only */}
+                    {/* Needs with Evidence - Verified Facts + Proof URL */}
                     {Array.isArray(analysis.needs) && analysis.needs.filter(item => item.type === 'fakta' || !item.type).length > 0 && (
                       <div>
                         <div style={{ fontSize: '0.8125rem', fontWeight: 700, color: 'var(--text-main)', marginBottom: '0.5rem' }}>
-                          {tx('Verified Operational Facts:', 'Pertimbangan Berbasis Fakta Terverifikasi:')}
+                          {tx('Verified Operational Facts:', 'Temuan Fakta & Bukti Sumber:')}
                         </div>
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '0.625rem' }}>
-                          {analysis.needs.filter(item => item.type === 'fakta' || !item.type).slice(0, 4).map((item, idx) => (
-                            <div key={idx} className="evidence-item">
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
-                                <span className="tag-pill tag-fact">
-                                  {tx('FACT', 'FAKTA')}
-                                </span>
-                                <strong style={{ fontSize: '0.875rem', color: 'var(--text-main)' }}>
-                                  {item.need}
-                                </strong>
-                              </div>
-                              <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', lineHeight: 1.45, marginTop: '2px' }}>
-                                {tx('Evidence:', 'Bukti:')} {item.evidence}
-                              </div>
-                              {item.quote && (
-                                <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontStyle: 'italic', marginTop: '4px', borderLeft: '2px solid var(--border-default)', paddingLeft: '8px', lineHeight: 1.4 }}>
-                                  &ldquo;{item.quote}&rdquo;
+                          {analysis.needs.filter(item => item.type === 'fakta' || !item.type).slice(0, 5).map((item, idx) => {
+                            const proofUrl = (item.url && /^https?:\/\//i.test(item.url))
+                              ? item.url
+                              : (analysis.source_url && /^https?:\/\//i.test(analysis.source_url)
+                                ? analysis.source_url
+                                : (analysis.google_place?.maps_url || `https://www.google.com/search?q=${encodeURIComponent(`${place.name} ${place.address || ''}`.trim())}`));
+                            return (
+                              <div key={idx} className="evidence-item">
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.5rem', flexWrap: 'wrap' }}>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                                    <span className="tag-pill tag-fact">
+                                      {tx('FACT', 'FAKTA')}
+                                    </span>
+                                    <strong style={{ fontSize: '0.875rem', color: 'var(--text-main)' }}>
+                                      {item.need}
+                                    </strong>
+                                  </div>
+                                  <a
+                                    href={proofUrl}
+                                    target="_blank"
+                                    rel="noopener noreferrer"
+                                    style={{
+                                      fontSize: '0.7rem',
+                                      color: 'var(--accent-text)',
+                                      fontWeight: 600,
+                                      textDecoration: 'underline',
+                                      display: 'inline-flex',
+                                      alignItems: 'center',
+                                      gap: '3px',
+                                      flexShrink: 0,
+                                    }}
+                                  >
+                                    <span>{tx('Verify Link', 'Cek Bukti')}</span>
+                                    <IconExternalLink />
+                                  </a>
                                 </div>
-                              )}
-                            </div>
-                          ))}
+                                <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', lineHeight: 1.5, marginTop: '4px' }}>
+                                  {tx('Evidence:', 'Bukti:')} {item.evidence}
+                                </div>
+                                {item.quote && (
+                                  <div style={{ fontSize: '0.75rem', color: 'var(--text-secondary)', fontStyle: 'italic', marginTop: '4px', borderLeft: '2px solid var(--border-default)', paddingLeft: '8px', lineHeight: 1.45 }}>
+                                    &ldquo;{item.quote}&rdquo;
+                                  </div>
+                                )}
+                              </div>
+                            );
+                          })}
                         </div>
                       </div>
                     )}
 
-                    {/* Verified Web Citations & Sources */}
-                    {Array.isArray(analysis.search_intelligence?.sources_cited) && analysis.search_intelligence.sources_cited.length > 0 && (
-                      <div>
-                        <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.375rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
-                          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
-                          <span>{tx('Verified Sources & Citations Investigated:', 'Sumber & Rujukan Web Terverifikasi:')}</span>
-                          <span style={{ fontSize: '0.625rem', background: 'var(--bg-subtle)', padding: '1px 5px', borderRadius: '4px', border: '1px solid var(--border-subtle)' }}>
-                            {analysis.search_intelligence.sources_cited.length}
-                          </span>
+                    {/* Verified Web Citations & Sources (Always show human-clickable verification links) */}
+                    {(() => {
+                      const rawSources = Array.isArray(analysis.search_intelligence?.sources_cited)
+                        ? analysis.search_intelligence.sources_cited
+                        : [];
+                      const seen = new Set();
+                      const citations = [];
+                      const pushCit = (url, title) => {
+                        if (!url || typeof url !== 'string' || !/^https?:\/\//i.test(url) || seen.has(url)) return;
+                        seen.add(url);
+                        citations.push({ url, title: title || url });
+                      };
+                      rawSources.forEach((s) => pushCit(s?.url, s?.title));
+                      if (analysis.source_url) pushCit(analysis.source_url, `Website: ${place.name}`);
+                      if (analysis.google_place?.maps_url) pushCit(analysis.google_place.maps_url, `Google Maps: ${place.name}`);
+                      if (Array.isArray(analysis.crawled_pages)) {
+                        analysis.crawled_pages.slice(0, 4).forEach((p) => pushCit(p?.url, p?.title || p?.url));
+                      }
+                      pushCit(`https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(`${place.name} ${place.address || ''}`.trim())}`, `Peta Lokasi: ${place.name}`);
+                      pushCit(`https://www.google.com/search?q=${encodeURIComponent(`"${place.name}" ${place.address || ''}`.trim())}`, `Pencarian Google: ${place.name}`);
+
+                      return (
+                        <div>
+                          <div style={{ fontSize: '0.75rem', fontWeight: 700, color: 'var(--text-muted)', marginBottom: '0.375rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/></svg>
+                            <span>{tx('Verified Sources & Citations for Human Check:', 'Tautan Bukti & Rujukan Verifikasi Manual:')}</span>
+                            <span style={{ fontSize: '0.625rem', background: 'var(--bg-subtle)', padding: '1px 5px', borderRadius: '4px', border: '1px solid var(--border-subtle)' }}>
+                              {citations.length}
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
+                            {citations.map((src, i) => (
+                              <a
+                                key={i}
+                                href={src.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                style={{
+                                  fontSize: '0.6875rem',
+                                  padding: '4px 9px',
+                                  background: 'var(--bg-card-subtle)',
+                                  border: '1px solid var(--border-subtle)',
+                                  borderRadius: '6px',
+                                  color: 'var(--text-main)',
+                                  textDecoration: 'none',
+                                  display: 'inline-flex',
+                                  alignItems: 'center',
+                                  gap: '4px',
+                                  maxWidth: '240px',
+                                  overflow: 'hidden',
+                                  textOverflow: 'ellipsis',
+                                  whiteSpace: 'nowrap'
+                                }}
+                                title={`${src.title}\n${src.url}`}
+                              >
+                                <span style={{ color: 'var(--accent-text)', marginRight: '3px', fontWeight: 600 }}>[Cek]</span> {src.title || src.url}
+                              </a>
+                            ))}
+                          </div>
                         </div>
-                        <div style={{ display: 'flex', flexWrap: 'wrap', gap: '6px' }}>
-                          {analysis.search_intelligence.sources_cited.map((src, i) => (
-                            <a
-                              key={i}
-                              href={src.url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              style={{
-                                fontSize: '0.6875rem',
-                                padding: '3px 8px',
-                                background: 'var(--bg-card-subtle)',
-                                border: '1px solid var(--border-subtle)',
-                                borderRadius: '6px',
-                                color: 'var(--text-main)',
-                                textDecoration: 'none',
-                                display: 'inline-flex',
-                                alignItems: 'center',
-                                gap: '4px',
-                                maxWidth: '220px',
-                                overflow: 'hidden',
-                                textOverflow: 'ellipsis',
-                                whiteSpace: 'nowrap'
-                              }}
-                              title={`${src.title}\n${src.url}`}
-                            >
-                              <span style={{ color: '#2563eb', marginRight: '3px', fontWeight: 600 }}>[link]</span> {src.title || src.url}
-                            </a>
-                          ))}
-                        </div>
-                      </div>
-                    )}
+                      );
+                    })()}
 
                     {/* Google Maps Real Data Badge */}
                     {analysis.google_place && analysis.google_place.rating && (
@@ -2237,29 +2348,357 @@ export default function ReachModal({ place: initialPlace, onClose, onUpdatePlace
               </div>
             </div>
 
-            {/* ================= KOLOM KANAN: Website & Dokumen PDF ================= */}
+            {/* ================= KOLOM KANAN: Email Outreach, Website Preview & Proposal ================= */}
             <div className="reach-column">
 
-              {/* Card 3: Prebuilt Website Instant Preview (Strategi Sales 10 Website/Hari) */}
-              <div className="reach-form-card" style={{ border: '1px solid #bfdbfe', background: '#f8fafc' }}>
-                <div className="reach-card-header" style={{ borderBottom: '1px solid #e2e8f0', paddingBottom: '8px' }}>
+              {/* Card 2.5: Generator Email Outreach (EN / ID, Regenerate & Counter Riwayat) */}
+              <div className="reach-form-card">
+                <div className="reach-card-header" style={{ flexWrap: 'wrap', gap: '8px' }}>
+                  <div className="reach-card-title">
+                    <IconMail />
+                    <span>{tx('Email Outreach Generator (EN / ID)', 'Generator Email Penawaran (EN / ID)')}</span>
+                  </div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '6px', flexWrap: 'wrap' }}>
+                    <div style={{ display: 'inline-flex', borderRadius: '6px', border: '1px solid var(--border-subtle)', overflow: 'hidden' }}>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOutreachLang('en');
+                          if (emailMode === 'ai') handleGenerateAiEmail('en', { regenerate: true });
+                        }}
+                        style={{
+                          minHeight: '34px',
+                          padding: '0 10px',
+                          fontSize: '0.75rem',
+                          fontWeight: outreachLang === 'en' ? 700 : 500,
+                          border: 'none',
+                          backgroundColor: outreachLang === 'en' ? 'var(--primary)' : 'var(--bg-app)',
+                          color: outreachLang === 'en' ? '#ffffff' : 'var(--text-muted)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        EN (English)
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setOutreachLang('id');
+                          if (emailMode === 'ai') handleGenerateAiEmail('id', { regenerate: true });
+                        }}
+                        style={{
+                          minHeight: '34px',
+                          padding: '0 10px',
+                          fontSize: '0.75rem',
+                          fontWeight: outreachLang === 'id' ? 700 : 500,
+                          border: 'none',
+                          borderLeft: '1px solid var(--border-subtle)',
+                          backgroundColor: outreachLang === 'id' ? 'var(--primary)' : 'var(--bg-app)',
+                          color: outreachLang === 'id' ? '#ffffff' : 'var(--text-muted)',
+                          cursor: 'pointer',
+                        }}
+                      >
+                        ID (Indonesia)
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Telemetry Counter & Controls */}
+                <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      flexWrap: 'wrap',
+                      gap: '8px',
+                      padding: '8px 10px',
+                      borderRadius: '6px',
+                      backgroundColor: 'var(--bg-app)',
+                      border: '1px solid var(--border-subtle)',
+                      fontSize: '0.72rem',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap', color: 'var(--text-muted)' }}>
+                      <span>
+                        Prospek ini: <strong style={{ color: 'var(--text-main)' }}>{emailGenStats?.placeCount || 0}x</strong>
+                      </span>
+                      <span>&bull;</span>
+                      <span>
+                        Hari ini: <strong style={{ color: 'var(--text-main)' }}>{emailGenStats?.todayTenantCount || 0}</strong>
+                      </span>
+                      <span>&bull;</span>
+                      <span>
+                        Total dibuat: <strong style={{ color: 'var(--text-main)' }}>{emailGenStats?.totalTenantCount || 0}</strong>
+                      </span>
+                      <span>&bull;</span>
+                      <span>
+                        Terakhir:{' '}
+                        <strong style={{ color: 'var(--text-main)' }}>
+                          {emailGenStats?.lastGeneratedAt
+                            ? new Date(emailGenStats.lastGeneratedAt).toLocaleString(lang === 'id' ? 'id-ID' : 'en-US', {
+                                day: '2-digit',
+                                month: 'short',
+                                hour: '2-digit',
+                                minute: '2-digit',
+                              })
+                            : 'Belum ada'}
+                        </strong>
+                      </span>
+                    </div>
+
+                    {(emailGenStats?.recentLogs?.length > 0 || emailGenStats?.placeHistory?.length > 0) && (
+                      <button
+                        type="button"
+                        onClick={() => setShowGenHistory(!showGenHistory)}
+                        style={{
+                          background: 'none',
+                          border: 'none',
+                          color: 'var(--accent-text)',
+                          fontSize: '0.72rem',
+                          fontWeight: 600,
+                          cursor: 'pointer',
+                          padding: '2px 4px',
+                        }}
+                      >
+                        {showGenHistory ? 'Tutup Riwayat' : `Riwayat (${emailGenStats?.recentLogs?.length || 0})`}
+                      </button>
+                    )}
+                  </div>
+
+                  {showGenHistory && (
+                    <div
+                      style={{
+                        borderRadius: '6px',
+                        border: '1px solid var(--border-subtle)',
+                        backgroundColor: 'var(--bg-app)',
+                        padding: '8px 10px',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '6px',
+                        maxHeight: '160px',
+                        overflowY: 'auto',
+                      }}
+                    >
+                      <div style={{ fontSize: '0.72rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                        Aktivitas Generate Email Terakhir (Akun Ini):
+                      </div>
+                      {(emailGenStats?.placeHistory?.length > 0 ? emailGenStats.placeHistory : emailGenStats?.recentLogs || []).map((log) => (
+                        <div
+                          key={log.id}
+                          style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'space-between',
+                            gap: '8px',
+                            fontSize: '0.72rem',
+                            paddingBottom: '4px',
+                            borderBottom: '1px dashed var(--border-subtle)',
+                          }}
+                        >
+                          <div style={{ minWidth: 0, flex: 1 }}>
+                            <span style={{ fontWeight: 700, color: 'var(--accent-text)', textTransform: 'uppercase', marginRight: '6px' }}>
+                              [{(log.lang || 'en').toUpperCase()}]
+                            </span>
+                            <span style={{ fontWeight: 600, color: 'var(--text-main)' }}>
+                              {log.company_name || place.name}:
+                            </span>{' '}
+                            <span style={{ color: 'var(--text-muted)' }}>{log.subject}</span>
+                            <div style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>
+                              {new Date(log.created_at).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                          </div>
+                          {log.body && (
+                            <button
+                              type="button"
+                              className="btn btn-secondary btn-xs"
+                              onClick={() => {
+                                setAiEmail({ subject: log.subject, body: log.body, lang: log.lang });
+                                setEmailMode('ai');
+                                setOutreachLang(log.lang === 'id' ? 'id' : 'en');
+                              }}
+                              style={{ minHeight: '30px', fontSize: '0.7rem' }}
+                            >
+                              Muat
+                            </button>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Mode Switcher + Generate / Regenerate Button */}
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                    <div style={{ display: 'flex', gap: '6px' }}>
+                      <button
+                        type="button"
+                        className={`btn btn-sm ${emailMode === 'template' ? 'btn-primary' : 'btn-secondary'}`}
+                        onClick={() => setEmailMode('template')}
+                        style={{ minHeight: '36px', fontSize: '0.75rem' }}
+                      >
+                        Template Cepat
+                      </button>
+                      <button
+                        type="button"
+                        className={`btn btn-sm ${emailMode === 'ai' ? 'btn-primary' : 'btn-secondary'}`}
+                        onClick={() => {
+                          setEmailMode('ai');
+                          if (!aiEmail) handleGenerateAiEmail(outreachLang);
+                        }}
+                        style={{ minHeight: '36px', fontSize: '0.75rem' }}
+                      >
+                        Draf AI Personal
+                      </button>
+                    </div>
+
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      disabled={aiEmailLoading}
+                      onClick={() => handleGenerateAiEmail(outreachLang, { regenerate: true })}
+                      style={{ minHeight: '38px', fontSize: '0.78rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '6px' }}
+                    >
+                      <IconRefresh />
+                      <span>
+                        {aiEmailLoading
+                          ? `Menyusun (${outreachLang.toUpperCase()})...`
+                          : ((emailGenStats?.placeCount || 0) > 0 || aiEmail)
+                            ? `Generate Ulang (${outreachLang.toUpperCase()})`
+                            : `Generate Email AI (${outreachLang.toUpperCase()})`}
+                      </span>
+                    </button>
+                  </div>
+
+                  {aiEmailError && (
+                    <div className="alert alert-danger" style={{ margin: 0, fontSize: '0.75rem', padding: '6px 10px' }}>
+                      {aiEmailError}
+                    </div>
+                  )}
+
+                  {/* Subject & Body Inputs */}
+                  <div>
+                    <label style={{ display: 'block', fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px' }}>
+                      Subjek Email ({outreachLang.toUpperCase()})
+                    </label>
+                    <input
+                      type="text"
+                      className="text-input"
+                      value={draftSubject}
+                      onChange={(e) => setDraftSubject(e.target.value)}
+                      style={{ width: '100%', fontSize: '0.8125rem' }}
+                    />
+                  </div>
+
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '4px' }}>
+                      <label style={{ fontSize: '0.72rem', fontWeight: 600, color: 'var(--text-muted)' }}>
+                        Isi Email ({emailMode === 'ai' ? 'AI Custom' : 'Template Anti-Slop'})
+                      </label>
+                      <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)' }}>
+                        {draftBody ? draftBody.trim().split(/\s+/).filter(Boolean).length : 0} kata
+                      </span>
+                    </div>
+                    <textarea
+                      className="textarea-input"
+                      rows={6}
+                      value={draftBody}
+                      onChange={(e) => setDraftBody(e.target.value)}
+                      style={{ width: '100%', fontSize: '0.8rem', lineHeight: 1.5 }}
+                    />
+                  </div>
+
+                  {/* Link Attachments */}
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '12px', fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                    <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={includeCalendly}
+                        onChange={(e) => setIncludeCalendly(e.target.checked)}
+                      />
+                      <span>Sertakan link Google Calendar</span>
+                    </label>
+                    {prebuiltUrl && (
+                      <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer' }}>
+                        <input
+                          type="checkbox"
+                          checked={includePreviewLink}
+                          onChange={(e) => setIncludePreviewLink(e.target.checked)}
+                        />
+                        <span>Sertakan link Website Preview</span>
+                      </label>
+                    )}
+                    {existingLogs.length > 0 && (
+                      <label style={{ display: 'inline-flex', alignItems: 'center', gap: '6px', cursor: 'pointer', color: 'var(--text-main)' }}>
+                        <input
+                          type="checkbox"
+                          checked={allowFollowup}
+                          onChange={(e) => setAllowFollowup(e.target.checked)}
+                        />
+                        <span>Izinkan follow-up ({existingLogs.length}x terkirim)</span>
+                      </label>
+                    )}
+                  </div>
+
+                  {/* Send / Copy Footer Buttons */}
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={async () => {
+                        const copied = await copyToClipboard(`${draftSubject}\n\n${draftBody}`);
+                        if (copied) {
+                          setSgCopyEmailSuccess(true);
+                          setTimeout(() => setSgCopyEmailSuccess(false), 2500);
+                        }
+                      }}
+                      style={{ minHeight: '38px', fontSize: '0.78rem', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
+                    >
+                      {sgCopyEmailSuccess ? <><IconCheck size={13} /> Tersalin</> : <><IconCopy /> Salin Email</>}
+                    </button>
+
+                    <button
+                      type="button"
+                      className="btn btn-primary btn-sm"
+                      disabled={sgOutreachLogging || !draftSubject.trim() || !draftBody.trim()}
+                      onClick={() => handleLogSgOutreach(draftSubject, draftBody, 'gmail')}
+                      style={{ minHeight: '38px', fontSize: '0.78rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: '5px', flex: 1, justifyContent: 'center' }}
+                    >
+                      <IconSend />
+                      <span>{sgOutreachLogging ? 'Mencatat...' : 'Buka Gmail & Catat Terkirim'}</span>
+                    </button>
+                  </div>
+
+                  {sgOutreachMsg && (
+                    <div
+                      className={`alert alert-${sgOutreachMsg.type === 'success' ? 'success' : sgOutreachMsg.type === 'warning' ? 'warning' : 'danger'}`}
+                      style={{ margin: 0, fontSize: '0.75rem', padding: '6px 10px' }}
+                    >
+                      {sgOutreachMsg.text}
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Card 3: Prebuilt Website Instant Preview */}
+              <div className="reach-form-card" style={{ border: '1px solid var(--border-subtle)', backgroundColor: 'var(--bg-card)' }}>
+                <div className="reach-card-header" style={{ borderBottom: '1px solid var(--border-subtle)', paddingBottom: '8px', flexWrap: 'wrap', gap: '8px' }}>
                   <div className="reach-card-title">
                     <IconGlobe />
-                    <span style={{ fontWeight: 700, color: '#1e3a8a' }}>{tx('Prebuilt Website Preview', 'Prebuilt Website Preview')}</span>
+                    <span style={{ fontWeight: 700, color: 'var(--text-main)' }}>{tx('Prebuilt Website Preview', 'Prebuilt Website Preview')}</span>
                     {prebuiltUrl && (
-                      <span className="reach-tab-pill-success" style={{ fontSize: '11px', background: '#dcfce7', color: '#15803d' }}>
+                      <span className="reach-tab-pill-success" style={{ fontSize: '11px' }}>
                         {tx('Preview Ready', 'Preview Siap')} ({prebuiltSite?.slug || tx('active', 'aktif')})
                       </span>
                     )}
                   </div>
-                  <div style={{ display: 'flex', gap: '8px' }}>
+                  <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                     {!prebuiltUrl ? (
                       <button
                         type="button"
                         className="btn btn-primary btn-sm"
                         disabled={prebuiltLoading}
-                        onClick={handleGeneratePrebuiltSite}
-                        style={{ minHeight: '32px', fontSize: '0.75rem', padding: '0.25rem 0.625rem' }}
+                        onClick={() => handleGeneratePrebuiltSite(false)}
+                        style={{ minHeight: '36px', fontSize: '0.75rem', padding: '0.25rem 0.75rem' }}
                       >
                         {prebuiltLoading ? tx('Building Website...', 'Menyusun Website...') : tx('Generate Website Preview', 'Generate Website Preview')}
                       </button>
@@ -2270,14 +2709,14 @@ export default function ReachModal({ place: initialPlace, onClose, onUpdatePlace
                           target="_blank"
                           rel="noreferrer"
                           className="btn btn-primary btn-sm"
-                          style={{ minHeight: '32px', fontSize: '0.75rem', padding: '0.25rem 0.625rem', textDecoration: 'none' }}
+                          style={{ minHeight: '36px', fontSize: '0.75rem', padding: '0.25rem 0.625rem', textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
                         >
                           {tx('Open Preview', 'Buka Preview')} <IconExternalLink />
                         </a>
                         <button
                           type="button"
                           className="btn btn-secondary btn-sm"
-                          style={{ minHeight: '32px', fontSize: '0.75rem', padding: '0.25rem 0.625rem' }}
+                          style={{ minHeight: '36px', fontSize: '0.75rem', padding: '0.25rem 0.625rem' }}
                           onClick={async () => {
                             const copied = await copyToClipboard(prebuiltUrl);
                             if (copied) {
@@ -2288,34 +2727,44 @@ export default function ReachModal({ place: initialPlace, onClose, onUpdatePlace
                         >
                           {copyPrebuiltSuccess ? <><IconCheck size={13} /> {tx('Link Copied', 'Link Tersalin')}</> : <><IconCopy /> {tx('Copy Link', 'Salin Link')}</>}
                         </button>
+                        <button
+                          type="button"
+                          className="btn btn-secondary btn-sm"
+                          disabled={prebuiltLoading}
+                          onClick={() => handleGeneratePrebuiltSite(true)}
+                          style={{ minHeight: '36px', fontSize: '0.75rem', padding: '0.25rem 0.625rem' }}
+                          title="Buat ulang tampilan website preview terbaru"
+                        >
+                          <IconRefresh /> {prebuiltLoading ? 'Memperbarui...' : 'Ulang'}
+                        </button>
                       </>
                     )}
                   </div>
                 </div>
 
-                <div style={{ fontSize: '0.8125rem', color: '#475569', lineHeight: 1.5 }}>
+                <div style={{ fontSize: '0.8125rem', color: 'var(--text-muted)', lineHeight: 1.55 }}>
                   {prebuiltUrl ? (
                     <div>
-                      <p style={{ margin: '0 0 6px' }}>
+                      <p style={{ margin: '0 0 8px' }}>
                         {tx(
-                          `A dedicated dynamic link for ${place.name} is active (Next.js Dynamic Route). As per Anti-Spam SOP, initial cold emails request permission first without including links. Check "Include Website Preview link" above when following up:`,
-                          `Tautan dinamis khusus untuk ${place.name} sudah aktif (Next.js Dynamic Route). Sesuai SOP Anti-Spam, cold email awal meminta izin terlebih dahulu tanpa menyertakan link. Centang "Sertakan link Website Preview" di atas jika ingin mengirimkannya saat follow-up/balasan:`
+                          `A dedicated dynamic link for ${place.name} is active. You can preview it live or attach it via "Sertakan link Website Preview" above:`,
+                          `Tautan halaman demo khusus untuk ${place.name} sudah aktif. Klik "Buka Preview" atau centang "Sertakan link Website Preview" di card email:`
                         )}
                       </p>
-                      <div style={{ background: '#ffffff', border: '1px solid #cbd5e1', padding: '6px 10px', borderRadius: '4px', fontFamily: 'monospace', fontSize: '12px', color: '#1e40af', wordBreak: 'break-all' }}>
+                      <div style={{ backgroundColor: 'var(--bg-app)', border: '1px solid var(--border-subtle)', padding: '8px 10px', borderRadius: '6px', fontFamily: 'monospace', fontSize: '12px', color: 'var(--accent-text)', wordBreak: 'break-all' }}>
                         {prebuiltUrl}
                       </div>
                     </div>
                   ) : (
                     <p style={{ margin: 0 }}>
                       {tx(
-                        `The system creates a personalized landing page for ${place.name} complete with Google review ratings, verified services, and Calendly domain booking without redeploying Vercel.`,
-                        `Sistem akan membuatkan halaman landing page dinamis khusus untuk ${place.name} lengkap dengan ulasan rating Google, layanan riil, dan tombol klaim domain Calendly tanpa perlu re-deploy Vercel.`
+                        `Create a tailored landing page preview for ${place.name} with verified location details, services, and booking call-to-action.`,
+                        `Sistem membuatkan halaman demo khusus untuk ${place.name} lengkap dengan detail lokasi, layanan utama, serta tombol penjadwalan.`
                       )}
                     </p>
                   )}
                   {prebuiltError && (
-                    <div className="alert alert-danger" style={{ marginTop: '8px', fontSize: '12px', padding: '4px 8px' }}>
+                    <div className="alert alert-danger" style={{ marginTop: '8px', fontSize: '12px', padding: '6px 10px' }}>
                       {prebuiltError}
                     </div>
                   )}
