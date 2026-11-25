@@ -66,11 +66,11 @@ function StatsSection({
             className="btn btn-secondary btn-sm"
             style={{
               padding: '4px 12px',
-              minHeight: '32px',
+              minHeight: '36px',
               fontSize: '12px',
               fontWeight: 600,
-              color: '#ef4444',
-              borderColor: 'rgba(239, 68, 68, 0.3)',
+              color: 'var(--danger-text)',
+              borderColor: 'var(--danger-border)',
             }}
           >
             {tx('Reset Filters', 'Reset Semua Filter')}
@@ -111,8 +111,8 @@ function StatsSection({
                   fontWeight: 600,
                   padding: '2px 8px',
                   borderRadius: '12px',
-                  backgroundColor: 'rgba(56, 189, 248, 0.12)',
-                  color: '#0284c7',
+                  backgroundColor: 'var(--accent-light)',
+                  color: 'var(--accent-text)',
                 }}
               >
                 {tx('Active Scan', 'Aktif')}
@@ -176,8 +176,8 @@ function StatsSection({
                   fontWeight: 600,
                   padding: '2px 8px',
                   borderRadius: '12px',
-                  backgroundColor: 'rgba(34, 197, 94, 0.12)',
-                  color: '#16a34a',
+                  backgroundColor: 'var(--success-bg)',
+                  color: 'var(--success-text)',
                 }}
               >
                 {total > 0 ? `${Math.round((withWebsite / total) * 100)}% Online` : '0%'}
@@ -241,8 +241,8 @@ function StatsSection({
                   fontWeight: 600,
                   padding: '2px 8px',
                   borderRadius: '12px',
-                  backgroundColor: 'rgba(99, 102, 241, 0.12)',
-                  color: '#6366f1',
+                  backgroundColor: 'var(--accent-light)',
+                  color: 'var(--accent-text)',
                 }}
               >
                 Ready
@@ -299,11 +299,12 @@ function StatsSection({
                 style={{
                   fontSize: '11px',
                   fontWeight: 700,
-                  padding: '2px 8px',
+                  minHeight: '36px',
+                  padding: '4px 10px',
                   borderRadius: '12px',
-                  backgroundColor: 'rgba(168, 85, 247, 0.12)',
-                  color: '#a855f7',
-                  border: 'none',
+                  backgroundColor: 'var(--accent-light)',
+                  color: 'var(--accent-text)',
+                  border: '1px solid var(--border-subtle)',
                   cursor: 'pointer',
                   display: 'inline-flex',
                   alignItems: 'center',
@@ -312,7 +313,6 @@ function StatsSection({
                 title={tx('Manage BYOK AI API Key & Email Settings', 'Kelola API Key AI & Konektor Email')}
               >
                 <span>Integrasi AI</span>
-                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
               </button>
             </div>
 

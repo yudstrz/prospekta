@@ -385,19 +385,16 @@ export default function InteractiveDemoChat({
             transform: translateY(0) scale(1);
           }
         }
-        @keyframes conciergePulse {
-          0%, 100% {
-            box-shadow: 0 8px 24px -4px ${accentColor}60, 0 4px 12px rgba(0,0,0,0.15);
-          }
-          50% {
-            box-shadow: 0 8px 28px 2px ${accentColor}80, 0 4px 14px rgba(0,0,0,0.22);
-          }
-        }
         .concierge-floating-window {
           animation: conciergeSlideIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
         .concierge-floating-button {
-          animation: conciergePulse 3.5s infinite ease-in-out;
+          box-shadow: 0 8px 24px -4px ${accentColor}60, 0 4px 12px rgba(0,0,0,0.15);
+          transition: transform 0.16s ease, box-shadow 0.16s ease;
+        }
+        .concierge-floating-button:hover {
+          transform: translateY(-2px);
+          box-shadow: 0 10px 26px -2px ${accentColor}75, 0 6px 14px rgba(0,0,0,0.2);
         }
       `}</style>
 

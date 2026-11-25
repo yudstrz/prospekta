@@ -28,7 +28,6 @@ const CLIENT_ROUTES = [
   '/api/enrich',
   '/api/sync/',
   '/api/crawl',
-  '/api/mcp/',
   '/api/ai-settings',
   '/api/ai-chat',
 ];
@@ -52,14 +51,10 @@ export async function middleware(request) {
     return NextResponse.redirect(redirectUrl);
   }
 
-  // 1. Whitelist: Halaman Publik untuk Prospek, Otentikasi, Tracking, MCP RPC, Webhook Telegram, dan Cron Worker
+  // 1. Whitelist: Halaman Publik untuk Prospek, Otentikasi, Tracking, Webhook Telegram, dan Cron Worker
   if (
     pathname.startsWith('/api/auth/') ||
     pathname.startsWith('/api/geo/') ||
-    pathname.startsWith('/api/mcp/admin') ||
-    pathname.startsWith('/api/mcp/user') ||
-    pathname.startsWith('/api/mcp/action') ||
-    pathname.startsWith('/api/mcp/openapi') ||
     pathname.startsWith('/p/') ||
     pathname.endsWith('-preview') ||
     pathname.startsWith('/api/cron/') ||

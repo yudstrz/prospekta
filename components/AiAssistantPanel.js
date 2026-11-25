@@ -64,6 +64,15 @@ export default function AiAssistantPanel({
     endRef.current?.scrollIntoView({ behavior: 'smooth' });
   }, [messages, liveStatus, isOpen]);
 
+  useEffect(() => {
+    if (!isOpen) return;
+    const onKey = (e) => {
+      if (e.key === 'Escape') onToggleOpen?.(false);
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [isOpen, onToggleOpen]);
+
   const handleProviderSwitch = (nextProvider) => {
     setSelectedProvider(nextProvider);
   };
@@ -185,20 +194,17 @@ export default function AiAssistantPanel({
     return (
       <button
         type="button"
+        className="prospekta-ai-launcher"
         onClick={() => onToggleOpen?.(true)}
         aria-label="Buka Prospekta AI Assistant"
         style={{
-          position: 'fixed',
-          right: '20px',
-          bottom: '74px',
-          zIndex: 1500,
           display: 'inline-flex',
           alignItems: 'center',
           gap: '8px',
           padding: '10px 16px',
           minHeight: '44px',
           borderRadius: '9999px',
-          border: '1px solid var(--primary)',
+          border: '1px solid var(--border-focus)',
           background: 'var(--bg-card)',
           color: 'var(--text-main)',
           boxShadow: '0 8px 24px rgba(15, 23, 42, 0.22)',
@@ -210,11 +216,12 @@ export default function AiAssistantPanel({
         <ProspektaMark size={22} />
         <span>AI Assistant</span>
         <span
+          aria-hidden="true"
           style={{
             width: '8px',
             height: '8px',
             borderRadius: '50%',
-            background: status.configured ? '#10b981' : '#f59e0b',
+            background: status.configured ? '#10b981' : '#d97706',
           }}
         />
       </button>
@@ -224,13 +231,9 @@ export default function AiAssistantPanel({
   return (
     <aside
       aria-label="Prospekta AI Assistant"
+      className="prospekta-ai-drawer"
       style={{
-        position: 'fixed',
-        right: '16px',
-        bottom: '16px',
-        zIndex: 1550,
         width: wide ? 'min(680px, calc(100vw - 24px))' : 'min(440px, calc(100vw - 24px))',
-        height: 'min(620px, calc(100vh - 96px))',
         display: 'flex',
         flexDirection: 'column',
         background: 'var(--bg-card)',
@@ -249,8 +252,8 @@ export default function AiAssistantPanel({
             <div style={{ fontWeight: 700, fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span>Prospekta AI Assistant</span>
             </div>
-            <div style={{ fontSize: '0.72rem', color: status.configured ? '#10b981' : '#f59e0b', display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
-              <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'currentColor' }} />
+            <div style={{ fontSize: '0.72rem', fontWeight: 600, color: status.configured ? 'var(--success-text)' : 'var(--warning-text)', display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
+              <span aria-hidden="true" style={{ width: '6px', height: '6px', borderRadius: '50%', background: status.configured ? '#10b981' : '#d97706' }} />
               {status.configured ? (
                 <span>
                   {currentProviderObj?.name || status.providerName} &bull; {status.model ? `${status.model} (Otomatis)` : (currentProviderObj?.modelLabel || 'Model Terbaru')}
@@ -305,7 +308,7 @@ export default function AiAssistantPanel({
                 aria-label="Pilih provider aktif"
                 value={selectedProvider}
                 onChange={(e) => handleProviderSwitch(e.target.value)}
-                style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-subtle)', borderRadius: '6px', padding: '3px 6px', fontSize: '0.72rem', minHeight: '28px' }}
+                style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-subtle)', borderRadius: '6px', padding: '4px 8px', fontSize: '0.74rem', minHeight: '36px' }}
               >
                 {status.savedProviders.map((sp) => (
                   <option key={sp.provider} value={sp.provider}>{sp.name} (Latest)</option>
@@ -316,7 +319,7 @@ export default function AiAssistantPanel({
               <button
                 type="button"
                 onClick={() => setMessages([])}
-                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.72rem', textDecoration: 'underline', padding: '2px 4px' }}
+                style={{ background: 'none', border: 'none', color: 'var(--text-muted)', cursor: 'pointer', fontSize: '0.74rem', textDecoration: 'underline', padding: '4px 6px', minHeight: '36px' }}
               >
                 Reset Chat
               </button>
@@ -391,9 +394,9 @@ export default function AiAssistantPanel({
               style={{
                 alignSelf: isUser ? 'flex-end' : 'stretch',
                 maxWidth: isUser ? '86%' : '100%',
-                background: isUser ? 'var(--primary)' : (msg.isError ? 'rgba(239, 68, 68, 0.1)' : 'var(--bg-app)'),
-                color: isUser ? '#ffffff' : (msg.isError ? '#ef4444' : 'var(--text-main)'),
-                border: isUser ? 'none' : `1px solid ${msg.isError ? 'rgba(239, 68, 68, 0.35)' : 'var(--border-subtle)'}`,
+                background: isUser ? 'var(--primary)' : (msg.isError ? 'var(--danger-bg)' : 'var(--bg-app)'),
+                color: isUser ? '#ffffff' : (msg.isError ? 'var(--danger-text)' : 'var(--text-main)'),
+                border: isUser ? 'none' : `1px solid ${msg.isError ? 'var(--danger-border)' : 'var(--border-subtle)'}`,
                 padding: '10px 12px',
                 borderRadius: '10px',
                 fontSize: '0.825rem',
@@ -443,7 +446,7 @@ export default function AiAssistantPanel({
                       type="button"
                       className="btn btn-secondary btn-sm"
                       onClick={() => onUiAction?.({ type: 'open_place_by_id', placeId: actionablePlaceId, name: actionablePlaceName })}
-                      style={{ minHeight: '34px', fontSize: '0.74rem' }}
+                      style={{ minHeight: '36px', fontSize: '0.74rem' }}
                     >
                       Buka Detail {actionablePlaceName || 'Prospek'}
                     </button>
@@ -455,9 +458,9 @@ export default function AiAssistantPanel({
                       target="_blank"
                       rel="noopener noreferrer"
                       className="btn btn-secondary btn-sm"
-                      style={{ minHeight: '34px', fontSize: '0.74rem', textDecoration: 'none' }}
+                      style={{ minHeight: '36px', fontSize: '0.74rem', textDecoration: 'none' }}
                     >
-                      Buka Preview {url} &rarr;
+                      Buka Preview {url}
                     </a>
                   ))}
                   {proposalTool && (
@@ -471,7 +474,7 @@ export default function AiAssistantPanel({
                           setTimeout(() => setCopiedId(null), 2000);
                         }
                       }}
-                      style={{ minHeight: '34px', fontSize: '0.74rem' }}
+                      style={{ minHeight: '36px', fontSize: '0.74rem' }}
                     >
                       {copiedId === msg.id ? 'Proposal Tersalin' : 'Salin Draf Proposal'}
                     </button>

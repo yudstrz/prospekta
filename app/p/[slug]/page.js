@@ -344,28 +344,11 @@ export default async function PrebuiltSitePage({ params }) {
           --brand-dark: ${darkBase};
         }
 
-        /* Pulsing Dot Animation for Live Hero Status Badge */
-        @keyframes heroPulse {
-          0% {
-            transform: scale(0.9);
-            box-shadow: 0 0 0 0 rgba(56, 189, 248, 0.7);
-          }
-          70% {
-            transform: scale(1.1);
-            box-shadow: 0 0 0 7px rgba(56, 189, 248, 0);
-          }
-          100% {
-            transform: scale(0.9);
-            box-shadow: 0 0 0 0 rgba(56, 189, 248, 0);
-          }
-        }
         .hero-pulsing-dot {
           width: 8px;
           height: 8px;
           border-radius: 50%;
           background: #38bdf8;
-          box-shadow: 0 0 10px #38bdf8;
-          animation: heroPulse 2s infinite cubic-bezier(0.4, 0, 0.6, 1);
           display: inline-block;
           flex-shrink: 0;
         }
@@ -482,7 +465,7 @@ export default async function PrebuiltSitePage({ params }) {
               rel="noreferrer" 
               style={{ color: '#38bdf8', textDecoration: 'none', fontWeight: 600, fontSize: '12px' }}
             >
-              Connect Official Domain &rarr;
+              Connect Official Domain
             </a>
           </div>
         </div>
@@ -887,8 +870,7 @@ export default async function PrebuiltSitePage({ params }) {
 
                 <div style={{ padding: '14px 20px 18px', borderTop: '1px solid #f1f5f9', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                   <a href="#interactive-demo" style={{ fontSize: '12px', fontWeight: 700, color: primaryColor, textDecoration: 'none', display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
-                    <span>View Specifications & Inquire</span>
-                    <span>&rarr;</span>
+                    <span>View Specifications &amp; Inquire</span>
                   </a>
                 </div>
               </div>
@@ -1038,7 +1020,7 @@ export default async function PrebuiltSitePage({ params }) {
                   rel="noreferrer"
                   style={{ color: primaryColor, fontWeight: 700, textDecoration: 'none' }}
                 >
-                  Open in Google Maps &rarr;
+                  Open in Google Maps
                 </a>
               </div>
             </div>

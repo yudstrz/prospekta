@@ -1526,7 +1526,7 @@ prospekta.id`
           <div style={{ padding: '0.625rem 0.875rem', background: 'var(--bg-card)', border: '1px solid var(--border-subtle)', borderRadius: 'var(--radius-sm)' }}>
             <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>Akun Pengirim Resmi</div>
             <div style={{ fontSize: '0.875rem', fontWeight: 700, color: 'var(--text-main)', marginTop: '2px' }}>admin@prospekta.id</div>
-            <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>Target Response Rate: 8% – 12%</div>
+            <div style={{ fontSize: '0.6875rem', color: 'var(--text-muted)' }}>Target Response Rate: 8% - 12%</div>
           </div>
         </div>
 

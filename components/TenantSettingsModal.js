@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import CompanyCrawlerModal from './CompanyCrawlerModal';
+import EmailConnectorSection from './EmailConnectorSection';
 
 const INDUSTRY_PRESETS = [
   { id: 'all', label: 'Semua Bidang Usaha', desc: 'Jangkauan luas seluruh tempat usaha komersial', keywords: 'all' },
@@ -22,14 +23,8 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [statusMsg, setStatusMsg] = useState(null);
-  const [showGmailGuide, setShowGmailGuide] = useState(false);
   const [showAdvancedTg, setShowAdvancedTg] = useState(false);
   const [showByok, setShowByok] = useState(false);
-  const [testingSmtp, setTestingSmtp] = useState(false);
-  const [connectingMcp, setConnectingMcp] = useState(false);
-  const [testingMcp, setTestingMcp] = useState(false);
-  const [mcpEmailInput, setMcpEmailInput] = useState('');
-  const [testRecipientInput, setTestRecipientInput] = useState('');
   const [linkingTg, setLinkingTg] = useState(false);
   const [isCrawlerOpen, setIsCrawlerOpen] = useState(false);
 
@@ -105,9 +100,6 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
           throw new Error(data.error || 'Gagal memuat pengaturan.');
         }
         if (data.settings) {
-          if (data.settings.gmail_mcp_account) {
-            setMcpEmailInput(data.settings.gmail_mcp_account);
-          }
           setSettings((prev) => ({
             ...prev,
             ...data.settings,
@@ -242,114 +234,6 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
       setStatusMsg({ type: 'error', text: err.message });
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleTestSmtp = async () => {
-    setTestingSmtp(true);
-    setStatusMsg(null);
-    try {
-      const url = tenantId ? `/api/settings?tenant_id=${encodeURIComponent(tenantId)}` : '/api/settings';
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'test_smtp',
-          smtp_host: settings.smtp_host,
-          smtp_port: settings.smtp_port,
-          smtp_user: settings.smtp_user,
-          smtp_from: settings.smtp_from,
-          smtp_pass: settings.smtp_pass || undefined,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.error || 'Verifikasi SMTP gagal.');
-      setStatusMsg({ type: 'success', text: data.message || 'Koneksi SMTP berhasil diverifikasi.' });
-    } catch (err) {
-      setStatusMsg({ type: 'error', text: err.message });
-    } finally {
-      setTestingSmtp(false);
-    }
-  };
-
-  const handleConnectMcp = async (customEmail) => {
-    setConnectingMcp(true);
-    setStatusMsg(null);
-    try {
-      const url = tenantId ? `/api/settings?tenant_id=${encodeURIComponent(tenantId)}` : '/api/settings';
-      const emailToUse = (customEmail || mcpEmailInput || settings.gmail_mcp_account || '').trim();
-      if (!emailToUse || !emailToUse.includes('@')) {
-        throw new Error('Alamat email Gmail pengirim belum diisi atau tidak valid.');
-      }
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'connect_mcp',
-          email: emailToUse,
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.error || 'Gagal menghubungkan MCP Gmail.');
-      setStatusMsg({ type: 'success', text: data.message });
-      setSettings((prev) => ({
-        ...prev,
-        email_provider_mode: 'gmail_mcp',
-        gmail_mcp_account: emailToUse,
-        gmail_mcp_connected: 1,
-      }));
-    } catch (err) {
-      setStatusMsg({ type: 'error', text: err.message });
-    } finally {
-      setConnectingMcp(false);
-    }
-  };
-
-  const handleDisconnectMcp = async () => {
-    setConnectingMcp(true);
-    setStatusMsg(null);
-    try {
-      const url = tenantId ? `/api/settings?tenant_id=${encodeURIComponent(tenantId)}` : '/api/settings';
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ action: 'disconnect_mcp' }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.error || 'Gagal memutuskan MCP Gmail.');
-      setStatusMsg({ type: 'success', text: data.message });
-      setSettings((prev) => ({
-        ...prev,
-        email_provider_mode: 'smtp',
-        gmail_mcp_connected: 0,
-      }));
-    } catch (err) {
-      setStatusMsg({ type: 'error', text: err.message });
-    } finally {
-      setConnectingMcp(false);
-    }
-  };
-
-  const handleTestMcp = async () => {
-    setTestingMcp(true);
-    setStatusMsg(null);
-    try {
-      const url = tenantId ? `/api/settings?tenant_id=${encodeURIComponent(tenantId)}` : '/api/settings';
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          action: 'test_mcp',
-          target_email: (testRecipientInput || settings.gmail_mcp_account || '').trim(),
-        }),
-      });
-      const data = await res.json();
-      if (!res.ok || !data.success) throw new Error(data.error || 'Gagal mengirim email uji coba MCP.');
-      setStatusMsg({ type: 'success', text: data.message });
-    } catch (err) {
-      setStatusMsg({ type: 'error', text: err.message });
-    } finally {
-      setTestingMcp(false);
     }
   };
 
@@ -514,7 +398,7 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
               Fitur &amp; Otomasi
             </button>
             <button type="button" onClick={() => setActiveTab('email')} style={navTabStyle('email')}>
-              Email Pengirim (SMTP &amp; MCP)
+              Email Pengirim
             </button>
             <button type="button" onClick={() => setActiveTab('telegram')} style={navTabStyle('telegram')}>
               Jadwal &amp; Notifikasi
@@ -531,9 +415,9 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                   padding: '0.75rem 1rem',
                   borderRadius: '8px',
                   marginBottom: '1rem',
-                  backgroundColor: statusMsg.type === 'success' ? 'rgba(22, 163, 74, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                  color: statusMsg.type === 'success' ? '#16a34a' : '#ef4444',
-                  border: `1px solid ${statusMsg.type === 'success' ? 'rgba(22, 163, 74, 0.2)' : 'rgba(239, 68, 68, 0.2)'}`,
+                  backgroundColor: statusMsg.type === 'success' ? 'var(--success-bg)' : 'var(--danger-bg)',
+                  color: statusMsg.type === 'success' ? 'var(--success-text)' : 'var(--danger-text)',
+                  border: `1px solid ${statusMsg.type === 'success' ? 'var(--success-border)' : 'var(--danger-border)'}`,
                   fontSize: '0.875rem',
                 }}
               >
@@ -603,11 +487,11 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                           className="btn btn-secondary btn-sm"
                           style={{
                             fontSize: '0.72rem',
-                            padding: '2px 8px',
-                            height: '26px',
-                            color: '#0284c7',
-                            borderColor: '#38bdf8',
-                            backgroundColor: '#f0f9ff',
+                            padding: '4px 10px',
+                            minHeight: '36px',
+                            color: 'var(--accent-text)',
+                            borderColor: 'var(--border-focus)',
+                            backgroundColor: 'var(--accent-light)',
                             display: 'inline-flex',
                             alignItems: 'center',
                             gap: '4px',
@@ -650,7 +534,7 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                           type="button"
                           onClick={() => setIsCrawlerOpen(true)}
                           className="btn btn-secondary btn-sm"
-                          style={{ fontSize: '0.72rem', height: '24px', padding: '0 8px', color: '#0284c7' }}
+                          style={{ fontSize: '0.72rem', minHeight: '36px', padding: '0 10px', color: 'var(--accent-text)' }}
                         >
                           + Kelola &amp; Ekstrak URL
                         </button>
@@ -931,13 +815,14 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                           }}
                           style={{
                             fontSize: '0.75rem',
-                            color: '#2563eb',
+                            color: 'var(--accent-text)',
                             background: 'none',
                             border: 'none',
                             cursor: 'pointer',
+                            minHeight: '36px',
                             padding: '2px 4px',
                             textDecoration: 'underline',
-                            fontWeight: 500,
+                            fontWeight: 600,
                           }}
                         >
                           Pilih Semua Sektor (Jangkauan Luas)
@@ -1179,8 +1064,8 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                                   fontSize: '0.7rem',
                                   padding: '1px 6px',
                                   borderRadius: '4px',
-                                  backgroundColor: isActive ? 'rgba(22,163,74,0.15)' : 'rgba(100,116,139,0.15)',
-                                  color: isActive ? '#16a34a' : 'var(--text-muted)',
+                                  backgroundColor: isActive ? 'var(--success-bg)' : 'var(--bg-card-subtle)',
+                                  color: isActive ? 'var(--success-text)' : 'var(--text-muted)',
                                   fontWeight: 700,
                                 }}
                               >
@@ -1190,7 +1075,7 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                             <p style={{ margin: '3px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
                               {m.desc}
                             </p>
-                            <div style={{ fontSize: '0.71875rem', color: '#2563eb', marginTop: '3px', fontWeight: 500 }}>
+                            <div style={{ fontSize: '0.71875rem', color: 'var(--accent-text)', marginTop: '3px', fontWeight: 500 }}>
                               <strong>Keuntungan:</strong> {m.benefit}
                             </div>
                           </div>
@@ -1229,426 +1114,29 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                   </div>
                 )}
 
-                {/* TAB 4: Email Pengirim (SMTP & MCP) */}
+                {/* TAB 4: Email Pengirim */}
                 {activeTab === 'email' && (
-                  <>
-                    <div
-                      style={{
-                        padding: '0.75rem 1rem',
-                        backgroundColor: 'rgba(37,99,235,0.06)',
-                        border: '1px solid rgba(37,99,235,0.2)',
-                        borderRadius: '8px',
-                        fontSize: '0.8125rem',
-                        color: 'var(--text-main)',
-                        lineHeight: 1.5,
-                        marginBottom: '4px',
-                      }}
-                    >
-                      <strong>Pilih Jalur Pengiriman Email:</strong><br />
-                      Gunakan <strong>Gmail MCP</strong> untuk koneksi cepat tanpa repot sandi aplikasi 16 karakter, atau gunakan <strong>Server SMTP</strong> jika Anda memakai email domain kantor sendiri.
-                    </div>
-
-                    {/* Mode Switcher */}
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: '8px', marginBottom: '8px' }}>
-                      <button
-                        type="button"
-                        onClick={() => setSettings({ ...settings, email_provider_mode: 'gmail_mcp' })}
-                        style={{
-                          padding: '12px 14px',
-                          borderRadius: '8px',
-                          border: settings.email_provider_mode === 'gmail_mcp' ? '2px solid #2563eb' : '1px solid var(--border-subtle)',
-                          backgroundColor: settings.email_provider_mode === 'gmail_mcp' ? 'rgba(37,99,235,0.08)' : 'var(--bg-app)',
-                          textAlign: 'left',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '4px',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <span style={{ fontWeight: 700, fontSize: '0.875rem', color: settings.email_provider_mode === 'gmail_mcp' ? '#2563eb' : 'var(--text-main)' }}>
-                            Integrasi Gmail MCP
-                          </span>
-                          <span style={{ fontSize: '0.6875rem', fontWeight: 600, padding: '2px 6px', borderRadius: '4px', backgroundColor: '#dbeafe', color: '#1e40af' }}>
-                            Direkomendasikan
-                          </span>
-                        </div>
-                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
-                          Koneksi langsung tanpa perlu membuat sandi aplikasi terpisah atau konfigurasi port.
-                        </span>
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={() => setSettings({ ...settings, email_provider_mode: 'smtp' })}
-                        style={{
-                          padding: '12px 14px',
-                          borderRadius: '8px',
-                          border: settings.email_provider_mode === 'smtp' ? '2px solid #2563eb' : '1px solid var(--border-subtle)',
-                          backgroundColor: settings.email_provider_mode === 'smtp' ? 'rgba(37,99,235,0.08)' : 'var(--bg-app)',
-                          textAlign: 'left',
-                          cursor: 'pointer',
-                          display: 'flex',
-                          flexDirection: 'column',
-                          gap: '4px',
-                        }}
-                      >
-                        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                          <span style={{ fontWeight: 700, fontSize: '0.875rem', color: settings.email_provider_mode === 'smtp' ? '#2563eb' : 'var(--text-main)' }}>
-                            Server SMTP Mandiri
-                          </span>
-                          <span style={{ fontSize: '0.6875rem', fontWeight: 600, padding: '2px 6px', borderRadius: '4px', backgroundColor: 'var(--bg-card-subtle)', color: 'var(--text-muted)' }}>
-                            Manual
-                          </span>
-                        </div>
-                        <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>
-                          Gunakan akun email domain perusahaan Anda (cPanel / Roundcube / Domain Sendiri).
-                        </span>
-                      </button>
-                    </div>
-
-                    {/* MODE 1: GMAIL MCP */}
-                    {settings.email_provider_mode === 'gmail_mcp' && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '12px', padding: '14px', borderRadius: '8px', border: '1px solid rgba(37,99,235,0.25)', backgroundColor: 'var(--bg-app)' }}>
-                        {settings.gmail_mcp_connected ? (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
-                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                <span style={{ display: 'inline-block', width: '8px', height: '8px', borderRadius: '50%', backgroundColor: '#10b981' }} />
-                                <strong style={{ fontSize: '0.85rem', color: '#166534' }}>Layanan Gmail MCP Aktif</strong>
-                              </div>
-                              <span style={{ fontSize: '0.75rem', fontWeight: 600, padding: '2px 8px', borderRadius: '9999px', backgroundColor: '#dcfce7', color: '#15803d' }}>
-                                Terhubung
-                              </span>
-                            </div>
-
-                            <div style={{ padding: '10px 12px', backgroundColor: 'rgba(37,99,235,0.05)', borderRadius: '6px', border: '1px solid var(--border-subtle)', fontSize: '0.825rem' }}>
-                              <div style={{ color: 'var(--text-muted)', fontSize: '0.75rem', marginBottom: '2px' }}>Akun Gmail Pengirim:</div>
-                              <strong style={{ fontSize: '0.925rem', color: 'var(--text-main)', wordBreak: 'break-all', overflowWrap: 'anywhere' }}>{settings.gmail_mcp_account || 'yourname@gmail.com'}</strong>
-                            </div>
-
-                            <div style={{ marginTop: '4px' }}>
-                              <label style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '4px' }}>
-                                Kirim Email Uji Coba ke Alamat Penerima:
-                              </label>
-                              <input
-                                type="email"
-                                placeholder="mis. penerima@gmail.com"
-                                value={testRecipientInput}
-                                onChange={(e) => setTestRecipientInput(e.target.value)}
-                                style={{
-                                  width: '100%',
-                                  height: '36px',
-                                  padding: '0 10px',
-                                  borderRadius: '6px',
-                                  border: '1px solid var(--border-subtle)',
-                                  backgroundColor: 'var(--bg-app)',
-                                  color: 'var(--text-main)',
-                                  fontSize: '0.825rem',
-                                  boxSizing: 'border-box'
-                                }}
-                              />
-                              <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginTop: '3px' }}>
-                                Kosongkan untuk mengirim ke email akun yang sedang login.
-                              </span>
-                            </div>
-
-                            <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '4px' }}>
-                              <button
-                                type="button"
-                                onClick={handleTestMcp}
-                                disabled={testingMcp}
-                                className="btn btn-primary"
-                                style={{ height: '36px', fontSize: '0.8rem', padding: '0 14px' }}
-                              >
-                                {testingMcp ? 'Mengirim email uji coba...' : 'Kirim Email Uji Coba'}
-                              </button>
-                              <button
-                                type="button"
-                                onClick={handleDisconnectMcp}
-                                disabled={connectingMcp}
-                                style={{
-                                  height: '36px',
-                                  padding: '0 12px',
-                                  borderRadius: '6px',
-                                  border: '1px solid rgba(239,68,68,0.35)',
-                                  background: 'transparent',
-                                  color: '#ef4444',
-                                  fontSize: '0.78rem',
-                                  fontWeight: 600,
-                                  cursor: 'pointer',
-                                }}
-                              >
-                                Putus Koneksi
-                              </button>
-                            </div>
-                          </div>
-                        ) : (
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
-                            <div>
-                              <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 600, marginBottom: '6px' }}>
-                                Alamat Email Gmail Pengirim
-                              </label>
-                              <input
-                                type="email"
-                                placeholder="Misal: yourname@gmail.com"
-                                value={mcpEmailInput}
-                                onChange={(e) => setMcpEmailInput(e.target.value)}
-                                style={{
-                                  width: '100%',
-                                  height: '40px',
-                                  padding: '0 12px',
-                                  borderRadius: '6px',
-                                  border: '1px solid var(--border-subtle)',
-                                  backgroundColor: 'var(--bg-app)',
-                                  color: 'var(--text-main)',
-                                  fontSize: '0.85rem',
-                                  boxSizing: 'border-box',
-                                }}
-                              />
-                              <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginTop: '3px' }}>
-                                Masukkan alamat Gmail yang digunakan untuk mengirim pesan outreach ke calon klien.
-                              </span>
-                            </div>
-
-                            <button
-                              type="button"
-                              onClick={() => handleConnectMcp(mcpEmailInput || settings.gmail_mcp_account || '')}
-                              disabled={connectingMcp}
-                              className="btn btn-primary"
-                              style={{ height: '40px', fontSize: '0.85rem', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
-                            >
-                              <span>{connectingMcp ? 'Menghubungkan layanan...' : 'Hubungkan Akun Gmail'}</span>
-                            </button>
-
-                            <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.6, marginTop: '2px' }}>
-                              <div>• <strong>Praktis:</strong> Tidak memerlukan sandi aplikasi khusus.</div>
-                              <div>• <strong>Deteksi Balasan Otomatis:</strong> Mendeteksi balasan email calon klien secara langsung.</div>
-                              <div>• <strong>Terlindungi:</strong> Jalur komunikasi dipisahkan khusus untuk akun bisnis Anda.</div>
-                            </div>
-                          </div>
-                        )}
-                      </div>
-                    )}
-
-                    {/* MODE 2: SERVER SMTP KUSTOM (TRADISIONAL) */}
-                    {settings.email_provider_mode === 'smtp' && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '14px' }}>
-
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 120px', gap: '10px' }}>
-                          <div>
-                            <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 600, marginBottom: '6px' }}>
-                              Alamat Server Email (SMTP Host) <span style={{ color: '#ef4444' }}>*</span>
-                            </label>
-                            <input
-                              type="text"
-                              placeholder="smtp.gmail.com atau mail.domainanda.com"
-                              value={settings.smtp_host || ''}
-                              onChange={(e) => setSettings({ ...settings, smtp_host: e.target.value })}
-                              style={{
-                                width: '100%',
-                                height: '40px',
-                                padding: '0 12px',
-                                borderRadius: '6px',
-                                border: '1px solid var(--border-subtle)',
-                                backgroundColor: 'var(--bg-app)',
-                                color: 'var(--text-main)',
-                                fontSize: '0.85rem',
-                                boxSizing: 'border-box',
-                              }}
-                            />
-                            <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginTop: '3px' }}>
-                              Misal: smtp.gmail.com atau mail.prospekta.id
-                            </span>
-                          </div>
-                          <div>
-                            <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 600, marginBottom: '6px' }}>
-                              Port Server
-                            </label>
-                            <input
-                              type="number"
-                              value={settings.smtp_port || 465}
-                              onChange={(e) => setSettings({ ...settings, smtp_port: e.target.value })}
-                              style={{
-                                width: '100%',
-                                height: '40px',
-                                padding: '0 12px',
-                                borderRadius: '6px',
-                                border: '1px solid var(--border-subtle)',
-                                backgroundColor: 'var(--bg-app)',
-                                color: 'var(--text-main)',
-                                fontSize: '0.85rem',
-                                boxSizing: 'border-box',
-                              }}
-                            />
-                            <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginTop: '3px' }}>
-                              Standar: 465 (SSL)
-                            </span>
-                          </div>
-                        </div>
-
-                        <div>
-                          <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 600, marginBottom: '6px' }}>
-                            Alamat Email Kantor Anda (Username Login) <span style={{ color: '#ef4444' }}>*</span>
-                          </label>
-                          <input
-                            type="email"
-                            placeholder="Contoh: timsales@perusahaan.com atau halo.toko@gmail.com"
-                            value={settings.smtp_user || ''}
-                            onChange={(e) => setSettings({ ...settings, smtp_user: e.target.value })}
-                            style={{
-                              width: '100%',
-                              height: '40px',
-                              padding: '0 12px',
-                              borderRadius: '6px',
-                              border: '1px solid var(--border-subtle)',
-                              backgroundColor: 'var(--bg-app)',
-                              color: 'var(--text-main)',
-                              fontSize: '0.85rem',
-                              boxSizing: 'border-box',
-                            }}
-                          />
-                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginTop: '3px' }}>
-                            Alamat email yang memiliki izin mengirim email penawaran ke calon klien.
-                          </span>
-                        </div>
-
-                        <div>
-                          <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 600, marginBottom: '6px' }}>
-                            Password Aplikasi Email (App Password)
-                          </label>
-                          <input
-                            type="password"
-                            placeholder={settings.smtp_pass_set ? '•••••••••••• (Tersimpan aman & terenkripsi)' : 'Masukkan password aplikasi 16 karakter'}
-                            value={settings.smtp_pass || ''}
-                            onChange={(e) => setSettings({ ...settings, smtp_pass: e.target.value })}
-                            style={{
-                              width: '100%',
-                              height: '40px',
-                              padding: '0 12px',
-                              borderRadius: '6px',
-                              border: '1px solid var(--border-subtle)',
-                              backgroundColor: 'var(--bg-app)',
-                              color: 'var(--text-main)',
-                              fontSize: '0.85rem',
-                              boxSizing: 'border-box',
-                            }}
-                          />
-                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: '4px' }}>
-                            <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                              Password disimpan terenkripsi dengan standar keamanan AES-256-GCM.
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => setShowGmailGuide(!showGmailGuide)}
-                              style={{ background: 'none', border: 'none', color: '#2563eb', fontSize: '0.75rem', cursor: 'pointer', padding: 0 }}
-                            >
-                              {showGmailGuide ? '▾ Tutup panduan' : '▸ Buka Panduan Gmail (Mudah)'}
-                            </button>
-                          </div>
-
-                          {showGmailGuide && (
-                            <div
-                              style={{
-                                backgroundColor: 'rgba(37, 99, 235, 0.05)',
-                                border: '1px solid rgba(37, 99, 235, 0.2)',
-                                padding: '0.75rem',
-                                borderRadius: '6px',
-                                marginTop: '6px',
-                                fontSize: '0.75rem',
-                                color: 'var(--text-main)',
-                                lineHeight: 1.5,
-                              }}
-                            >
-                              <strong>Cara mudah buat Sandi Aplikasi di Gmail (hanya 1 menit):</strong>
-                              <ol style={{ margin: '4px 0 0 16px', padding: 0 }}>
-                                <li>Buka Akun Google Anda &gt; menu <strong>Keamanan (Security)</strong>.</li>
-                                <li>Pastikan <strong>Verifikasi 2 Langkah</strong> sudah aktif.</li>
-                                <li>Cari menu <strong>Sandi Aplikasi (App Passwords)</strong>.</li>
-                                <li>Ketik nama aplikasi bebas (cth: &quot;Prospekta&quot;), lalu klik Buat.</li>
-                                <li>Salin 16 huruf sandi yang muncul dan tempelkan ke kotak di atas.</li>
-                              </ol>
-                            </div>
-                          )}
-                        </div>
-
-                        <div>
-                          <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 600, marginBottom: '6px' }}>
-                            Tampilan Nama Pengirim di Kotak Masuk Klien (From Header)
-                          </label>
-                          <input
-                            type="text"
-                            placeholder="Contoh: Budi - Tim Sales Perusahaan &lt;sales@perusahaan.com&gt;"
-                            value={settings.smtp_from || ''}
-                            onChange={(e) => setSettings({ ...settings, smtp_from: e.target.value })}
-                            style={{
-                              width: '100%',
-                              height: '40px',
-                              padding: '0 12px',
-                              borderRadius: '6px',
-                              border: '1px solid var(--border-subtle)',
-                              backgroundColor: 'var(--bg-app)',
-                              color: 'var(--text-main)',
-                              fontSize: '0.85rem',
-                              boxSizing: 'border-box',
-                            }}
-                          />
-                          <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)', display: 'block', marginTop: '3px' }}>
-                            Nama ini yang akan terlihat oleh calon klien saat mereka menerima email dari Anda.
-                          </span>
-                        </div>
-
-                        <div
-                          style={{
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'space-between',
-                            flexWrap: 'wrap',
-                            gap: '10px',
-                            padding: '10px 12px',
-                            borderRadius: '8px',
-                            border: '1px solid var(--border-subtle)',
-                            backgroundColor: 'var(--bg-app)',
-                          }}
-                        >
-                          <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', flex: 1, minWidth: '200px' }}>
-                            Koneksi diverifikasi dengan TLS 1.2+ &amp; proteksi anti-SSRF. Password tidak pernah dikirim ulang ke browser.
-                          </span>
-                          <div style={{ display: 'flex', gap: '8px' }}>
-                            {settings.smtp_pass_set && (
-                              <button
-                                type="button"
-                                onClick={() => handleRevokeSecret('smtp_pass', 'Password SMTP')}
-                                disabled={saving || testingSmtp}
-                                style={{
-                                  height: '36px',
-                                  padding: '0 10px',
-                                  borderRadius: '6px',
-                                  border: '1px solid rgba(239,68,68,0.35)',
-                                  background: 'transparent',
-                                  color: '#ef4444',
-                                  fontSize: '0.78rem',
-                                  fontWeight: 600,
-                                  cursor: 'pointer',
-                                }}
-                              >
-                                Cabut Sandi
-                              </button>
-                            )}
-                            <button
-                              type="button"
-                              onClick={handleTestSmtp}
-                              disabled={testingSmtp || !settings.smtp_host}
-                              className="btn btn-secondary"
-                              style={{ height: '36px', fontSize: '0.8rem', padding: '0 12px' }}
-                            >
-                              {testingSmtp ? 'Menguji koneksi...' : 'Tes Koneksi SMTP'}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </>
+                  <EmailConnectorSection
+                    tenantId={tenantId}
+                    initialSettings={settings}
+                    showSmtpFromField={true}
+                    showSmtpRevokeButton={true}
+                    onRevokeSmtpPass={() => handleRevokeSecret('smtp_pass', 'Password SMTP')}
+                    onSettingsChange={(nextSettings, fieldSync) => {
+                      if (nextSettings) {
+                        setSettings((prev) => ({
+                          ...prev,
+                          ...nextSettings,
+                          smtp_pass: '',
+                          telegram_bot_token: '',
+                          llm_key: '',
+                        }));
+                      } else if (fieldSync) {
+                        setSettings((prev) => ({ ...prev, ...fieldSync }));
+                      }
+                    }}
+                    idPrefix="tenant-email"
+                  />
                 )}
 
                 {/* TAB 5: Telegram, Kuota & BYOK */}
@@ -1766,7 +1254,7 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                       <button
                         type="button"
                         onClick={() => setShowAdvancedTg(!showAdvancedTg)}
-                        style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: '#2563eb', fontSize: '0.75rem', cursor: 'pointer', padding: 0 }}
+                        style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: 'var(--accent-text)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', minHeight: '36px', padding: 0 }}
                       >
                         {showAdvancedTg ? '▾ Sembunyikan pengaturan bot manual' : '▸ Atur Chat ID / Bot Kustom manual (opsional)'}
                       </button>
@@ -1797,7 +1285,7 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                           </div>
                           <div>
                             <label style={{ display: 'block', fontSize: '0.78rem', fontWeight: 600, marginBottom: '4px' }}>
-                              Bot Token Pribadi (Opsional — kosongkan untuk memakai bot resmi)
+                              Bot Token Pribadi (Opsional, kosongkan untuk memakai bot resmi)
                             </label>
                             <div style={{ display: 'flex', gap: '8px' }}>
                               <input
@@ -1821,7 +1309,7 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                                 <button
                                   type="button"
                                   onClick={() => handleRevokeSecret('telegram_bot_token', 'Bot Token Kustom')}
-                                  style={{ height: '38px', padding: '0 10px', borderRadius: '6px', border: '1px solid rgba(239,68,68,0.35)', background: 'none', color: '#ef4444', fontSize: '0.75rem', cursor: 'pointer' }}
+                                  style={{ height: '38px', padding: '0 10px', borderRadius: '6px', border: '1px solid var(--danger-border)', background: 'none', color: 'var(--danger-text)', fontSize: '0.75rem', cursor: 'pointer' }}
                                 >
                                   Hapus
                                 </button>
@@ -1881,7 +1369,7 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                         }}
                       />
                       <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>
-                        Berapa banyak calon klien baru yang ingin dihubungi per hari kerja. Disarankan 20 &ndash; 50 email per hari agar akun email Anda aman dan tidak dicurigai sebagai spam.
+                        Berapa banyak calon klien baru yang ingin dihubungi per hari kerja. Disarankan 20 - 50 email per hari agar akun email Anda aman dan tidak dicurigai sebagai spam.
                       </span>
                     </div>
                   </>
@@ -1896,8 +1384,9 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                           padding: '0.6rem 0.8rem',
                           borderRadius: '6px',
                           marginBottom: '10px',
-                          backgroundColor: memberMsg.type === 'success' ? 'rgba(22, 163, 74, 0.1)' : 'rgba(239, 68, 68, 0.1)',
-                          color: memberMsg.type === 'success' ? '#16a34a' : '#ef4444',
+                          backgroundColor: memberMsg.type === 'success' ? 'var(--success-bg)' : 'var(--danger-bg)',
+                          border: `1px solid ${memberMsg.type === 'success' ? 'var(--success-border)' : 'var(--danger-border)'}`,
+                          color: memberMsg.type === 'success' ? 'var(--success-text)' : 'var(--danger-text)',
                           fontSize: '0.8rem',
                         }}
                       >
@@ -1917,7 +1406,7 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                       <span style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '8px' }}>
                         + Tambah Anggota Tim Baru
                       </span>
-                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 110px 100px', gap: '8px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
                         <input
                           type="email"
                           placeholder="email@tim.com"
@@ -1984,8 +1473,8 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                                   fontSize: '0.7rem',
                                   padding: '2px 8px',
                                   borderRadius: '10px',
-                                  backgroundColor: m.role === 'client_admin' ? 'rgba(37, 99, 235, 0.15)' : 'rgba(100, 116, 139, 0.15)',
-                                  color: m.role === 'client_admin' ? '#2563eb' : 'var(--text-muted)',
+                                  backgroundColor: m.role === 'client_admin' ? 'var(--accent-light)' : 'var(--bg-card-subtle)',
+                                  color: m.role === 'client_admin' ? 'var(--accent-text)' : 'var(--text-muted)',
                                   fontWeight: 600,
                                 }}
                               >
@@ -1998,10 +1487,12 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                                   style={{
                                     background: 'none',
                                     border: 'none',
-                                    color: '#ef4444',
+                                    color: 'var(--danger-text)',
                                     fontSize: '0.75rem',
+                                    fontWeight: 600,
                                     cursor: 'pointer',
-                                    padding: '2px 6px',
+                                    minHeight: '36px',
+                                    padding: '2px 8px',
                                   }}
                                 >
                                   Hapus

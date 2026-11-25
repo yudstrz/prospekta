@@ -2683,7 +2683,6 @@ export default function DashboardPage() {
                                         }}
                                       >
                                         <span>WA</span>
-                                        <span style={{ fontSize: '0.5625rem' }}>&rarr;</span>
                                       </a>
                                     )}
                                   </div>
@@ -2880,7 +2879,6 @@ export default function DashboardPage() {
                                           }}
                                         >
                                           <span>WA</span>
-                                          <span style={{ fontSize: '0.5625rem' }}>&rarr;</span>
                                         </a>
                                       )}
                                     </div>

@@ -19,7 +19,6 @@
   "homepage": "https://github.com/yudstrz/prospekta#readme",
   "dependencies": {
     "@google/genai": "^3.6.1",
-    "@google/generative-ai": "^0.24.1",
     "@libsql/client": "^0.18.0",
     "@neondatabase/serverless": "^1.2.1",
     "cheerio": "^1.2.0",

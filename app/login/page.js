@@ -142,11 +142,6 @@ export default function LoginPage() {
           40%, 80% { transform: translateX(6px); }
         }
 
-        @keyframes pulseStatus {
-          0%, 100% { opacity: 1; transform: scale(1); }
-          50% { opacity: 0.45; transform: scale(0.85); }
-        }
-
         @keyframes rotateSpinner {
           0% { transform: rotate(0deg); }
           100% { transform: rotate(360deg); }

@@ -186,7 +186,7 @@ export async function POST(request) {
             <strong>Email Penerima (To):</strong> ${esc(targetEmail)}
           </div>
           <p style="font-size:13px;color:#334155">Balas email ini untuk memastikan balasan langsung masuk ke kotak masuk <strong>${esc(senderEmail)}</strong>.</p>
-          <p style="color:#64748b;font-size:12px;margin-bottom:0">${esc(compName)} &bull; Prospekta MCP Hub</p>
+          <p style="color:#64748b;font-size:12px;margin-bottom:0">${esc(compName)} &bull; Prospekta</p>
         </div>`,
         saveToSent: false,
       });

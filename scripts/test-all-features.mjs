@@ -265,93 +265,25 @@ async function runTestSuite() {
     console.error('❌ TEST 5 ERROR:', err);
   }
 
-  // ----------------------------------------------------
-  // TEST 6: Dual-Role MCP Plugin Endpoints (/api/mcp/admin & /api/mcp/user)
-  // ----------------------------------------------------
-  console.log('--- TEST 6: Universal MCP Dual-Role Plugin (/api/mcp/admin & /api/mcp/user) ---');
+  // TEST 6: BYOK AI Settings & AI Chat Endpoints (/api/ai-settings & /api/ai-chat)
+  console.log('--- TEST 6: BYOK Multi-User AI Settings & Chat (/api/ai-settings & /api/ai-chat) ---');
   try {
-    // 6a: Create MCP Token via API
-    const createTokRes = await fetch(`${BASE_URL}/api/mcp/tokens`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Cookie: adminCookie,
-      },
-      body: JSON.stringify({ label: 'Test MCP Token Bandung' }),
+    const aiSettingsRes = await fetch(`${BASE_URL}/api/ai-settings`, {
+      headers: { Cookie: adminCookie },
     });
-    const tokData = await createTokRes.json();
-    console.log('Create MCP Token Result:', tokData);
-    const mcpToken = tokData.token;
-
-    // 6b: Test Admin MCP Endpoint Tools List
-    const adminMcpRes = await fetch(`${BASE_URL}/api/mcp/admin`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${mcpToken}`,
-      },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: 1,
-        method: 'tools/list',
-      }),
+    const aiSettingsData = await aiSettingsRes.json();
+    const aiChatRes = await fetch(`${BASE_URL}/api/ai-chat`, {
+      headers: { Cookie: adminCookie },
     });
-    const adminMcpData = await adminMcpRes.json();
-    console.log('MCP Admin tools/list Status:', adminMcpRes.status);
-    const adminTools = adminMcpData.result?.tools?.map((t) => t.name) || [];
-    console.log('MCP Admin Tools Count:', adminTools.length, 'Tools:', adminTools);
-
-    // 6c: Test Calling location_search tool on Gedung Sate Bandung
-    const callMcpRes = await fetch(`${BASE_URL}/api/mcp/admin`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${mcpToken}`,
-      },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: 2,
-        method: 'tools/call',
-        params: {
-          name: 'location_search',
-          arguments: {
-            query: 'Gedung Sate Bandung',
-          },
-        },
-      }),
+    const aiChatData = await aiChatRes.json();
+    console.log('BYOK Endpoints:', {
+      settingsStatus: aiSettingsRes.status,
+      providers: (aiSettingsData.providers || []).map((p) => p.id),
+      chatStatus: aiChatRes.status,
+      configured: aiChatData.configured,
     });
-    const callMcpData = await callMcpRes.json();
-    console.log('MCP call location_search Result:', {
-      success: !!callMcpData.result,
-      content: callMcpData.result?.content?.[0]?.text?.slice ? callMcpData.result.content[0].text.slice(0, 100) + '...' : callMcpData.result,
-    });
-
-    // 6d: Test User MCP Endpoint
-    // Create User Token
-    const userMcpRes = await fetch(`${BASE_URL}/api/mcp/user`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${mcpToken}`,
-      },
-      body: JSON.stringify({
-        jsonrpc: '2.0',
-        id: 3,
-        method: 'tools/list',
-      }),
-    });
-    const userMcpData = await userMcpRes.json();
-    console.log('MCP User tools/list Status:', userMcpRes.status);
-    const userTools = userMcpData.result?.tools?.map((t) => t.name) || [];
-    console.log('MCP User Tools Count:', userTools.length, 'Tools:', userTools);
-
-    if (adminTools.length > 0 && userTools.length > 0) {
-      console.log('✅ TEST 6 PASSED: Dual-Role MCP Plugin is active, secured, and callable.\n');
-    } else {
-      console.log('⚠️ TEST 6 NOTE:', adminMcpData);
-    }
   } catch (err) {
-    console.error('❌ TEST 6 ERROR:', err);
+    console.error('TEST 6 ERROR:', err);
   }
 
   console.log('====================================================');
