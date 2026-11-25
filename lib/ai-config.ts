@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { GoogleGenAI } from '@google/genai';
 
-export type AiProvider = 'gemini' | 'openai' | 'claude';
+export type AiProvider = 'agnes' | 'gemini' | 'openai' | 'claude';
 export type AiRole = 'admin' | 'user';
 export type AiConfigMode = 'latest' | 'pinned';
 
@@ -37,7 +37,7 @@ const envStr = (key: string): string => (process.env[key] || '').trim();
 
 export function normalizeProvider(provider?: string | null): AiProvider | null {
   const norm = String(provider || '').trim().toLowerCase();
-  if (norm === 'gemini' || norm === 'openai' || norm === 'claude') return norm;
+  if (norm === 'agnes' || norm === 'gemini' || norm === 'openai' || norm === 'claude') return norm;
   return null;
 }
 
@@ -53,18 +53,39 @@ export function getAiEnvironmentMode(): AiConfigMode {
   return runtimeEnv === 'production' ? 'pinned' : 'latest';
 }
 
+export function getAgnesEnvConfig() {
+  const agentKey = envStr('AGENT_API_KEY') || envStr('FLASH_MODEL_API_KEY') || '';
+  const agentBaseUrl = envStr('AGENT_API_BASE_URL') || '';
+  const agentModel = envStr('AGENT_MODEL_ID') || envStr('GEMINI_MODEL') || 'gemini-flash-latest';
+  const geminiKey = envStr('GEMINI_API_KEY') || '';
+  const openaiKey = envStr('OPENAI_API_KEY') || '';
+  const claudeKey = envStr('ANTHROPIC_API_KEY') || '';
+  const configured = Boolean((agentKey && agentBaseUrl) || geminiKey || openaiKey || claudeKey);
+  return { configured, agentKey, agentBaseUrl, agentModel, geminiKey, openaiKey, claudeKey };
+}
+
 export function getAiConfig(): {
   defaultProvider: AiProvider;
   mode: AiConfigMode;
   providers: Record<AiProvider, ProviderEnvConfig>;
 } {
-  const defaultProvider = normalizeProvider(envStr('AI_PROVIDER')) || 'gemini';
+  const defaultProvider = normalizeProvider(envStr('AI_PROVIDER')) || 'agnes';
   const mode = getAiEnvironmentMode();
 
   return {
     defaultProvider,
     mode,
     providers: {
+      agnes: {
+        id: 'agnes',
+        displayName: 'Agnes AI (Bawaan Platform)',
+        latestDefault: envStr('AGENT_MODEL_ID') || envStr('GEMINI_MODEL') || 'gemini-flash-latest',
+        pinnedDefault: envStr('AGENT_MODEL_ID') || envStr('GEMINI_MODEL_PINNED') || 'gemini-flash-latest',
+        adminModel: envStr('AGENT_ADMIN_MODEL') || undefined,
+        userModel: envStr('AGENT_USER_MODEL') || undefined,
+        fallbackModel: envStr('GEMINI_FALLBACK_MODEL') || 'gemini-flash-latest',
+        rollingAlias: 'gemini-flash-latest',
+      },
       gemini: {
         id: 'gemini',
         displayName: 'Google Gemini',
@@ -105,6 +126,10 @@ export function getAiConfig(): {
  */
 export function getServerProviderKey(provider?: AiProvider | string | null): string | null {
   const norm = normalizeProvider(provider) || getAiConfig().defaultProvider;
+  if (norm === 'agnes') {
+    const ag = getAgnesEnvConfig();
+    return (ag.agentBaseUrl ? ag.agentKey : '') || ag.geminiKey || ag.openaiKey || ag.claudeKey || null;
+  }
   if (norm === 'gemini') return envStr('GEMINI_API_KEY') || null;
   if (norm === 'openai') return envStr('OPENAI_API_KEY') || null;
   if (norm === 'claude') return envStr('ANTHROPIC_API_KEY') || null;

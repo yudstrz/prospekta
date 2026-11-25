@@ -3,6 +3,8 @@ import { sessionFromRequest } from '@/lib/auth';
 import {
   AI_PROVIDERS,
   normalizeProvider,
+  hasAgnesPlatformEngine,
+  getModel,
   testProviderConnection,
   listUserAiKeys,
   saveUserAiKey,
@@ -12,16 +14,23 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-function buildSettingsPayload(keys, resolvedLatestModel = null) {
+function buildSettingsPayload(keys, resolvedLatestModel = null, role = 'user') {
   const active = keys.find((k) => k.is_active) || null;
   const activeMeta = active ? AI_PROVIDERS[active.provider] : null;
+  const agnesAvailable = hasAgnesPlatformEngine();
+  const agnesModel = getModel('agnes', role);
+  const activeIsAgnes = !active && agnesAvailable;
+
   return {
     providers: Object.values(AI_PROVIDERS),
     keys,
-    activeProvider: active?.provider || null,
-    activeProviderName: activeMeta?.name || null,
-    activeModel: resolvedLatestModel || activeMeta?.modelLabel || null,
-    maskedKey: active?.masked_key || null,
+    agnesAvailable,
+    agnesModel,
+    activeSource: active ? 'byok' : (agnesAvailable ? 'agnes' : null),
+    activeProvider: active?.provider || (agnesAvailable ? 'agnes' : null),
+    activeProviderName: activeMeta?.name || (activeIsAgnes ? 'Agnes AI (Bawaan Platform .env)' : null),
+    activeModel: active ? (resolvedLatestModel || activeMeta?.modelLabel || null) : (activeIsAgnes ? agnesModel : null),
+    maskedKey: active?.masked_key || (activeIsAgnes ? 'ENV Platform' : null),
   };
 }
 
@@ -32,7 +41,7 @@ export async function GET(request) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
     const keys = await listUserAiKeys(session.uid);
-    return NextResponse.json({ success: true, ...buildSettingsPayload(keys) });
+    return NextResponse.json({ success: true, ...buildSettingsPayload(keys, null, session.role) });
   } catch (err) {
     return NextResponse.json({ success: false, error: err.message }, { status: err.status || 500 });
   }
@@ -93,14 +102,18 @@ export async function PATCH(request) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
     const body = await request.json().catch(() => ({}));
+    const norm = normalizeProvider(body.provider);
     const keys = await setActiveUserAiProvider({
       userId: session.uid,
       provider: body.provider,
     });
+    const activeName = norm === 'agnes'
+      ? 'Agnes AI (Bawaan Platform .env)'
+      : (AI_PROVIDERS[norm]?.name || body.provider);
     return NextResponse.json({
       success: true,
-      message: `Provider aktif diubah ke ${AI_PROVIDERS[normalizeProvider(body.provider)]?.name || body.provider}.`,
-      ...buildSettingsPayload(keys),
+      message: `Provider aktif diubah ke ${activeName}.`,
+      ...buildSettingsPayload(keys, null, session.role),
     });
   } catch (err) {
     return NextResponse.json({ success: false, error: err.message }, { status: err.status || 400 });

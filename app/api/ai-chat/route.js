@@ -1,6 +1,14 @@
 import { NextResponse } from 'next/server';
 import { sessionFromRequest } from '@/lib/auth';
-import { AI_PROVIDERS, getDecryptedActiveKey, listUserAiKeys, resolveLatestModel, resolveModelForProvider } from '@/lib/ai-keys';
+import {
+  AI_PROVIDERS,
+  hasAgnesPlatformEngine,
+  getModel,
+  getDecryptedActiveKey,
+  listUserAiKeys,
+  resolveLatestModel,
+  resolveModelForProvider,
+} from '@/lib/ai-keys';
 import { runAiChatLoop } from '@/lib/ai-providers';
 import { sanitizeAiErrorMessage } from '@/lib/ai-crypto';
 
@@ -14,30 +22,50 @@ export async function GET(request) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
     const keys = await listUserAiKeys(session.uid);
-    const active = keys.find((k) => k.is_active) || keys[0] || null;
+    const active = keys.find((k) => k.is_active) || null;
+    const agnesAvailable = hasAgnesPlatformEngine();
     const providerMeta = active ? AI_PROVIDERS[active.provider] : null;
+
     let resolvedModel = null;
     if (active) {
       const dec = await getDecryptedActiveKey(session.uid, active.provider).catch(() => null);
       if (dec?.apiKey) {
         resolvedModel = await resolveLatestModel(active.provider, dec.apiKey, false, session?.role).catch(() => providerMeta?.fallbackModel || null);
       }
+    } else if (agnesAvailable) {
+      resolvedModel = getModel('agnes', session?.role);
     }
-    return NextResponse.json({
-      success: true,
-      configured: Boolean(active),
-      provider: active?.provider || null,
-      providerName: providerMeta?.name || null,
-      model: resolvedModel,
-      modelLabel: providerMeta?.modelLabel || 'Otomatis Model Terbaru',
-      maskedKey: active?.masked_key || null,
-      savedProviders: keys.map((k) => ({
+
+    const savedProviders = [
+      ...(agnesAvailable
+        ? [{
+            provider: 'agnes',
+            name: 'Agnes AI (Platform .env)',
+            modelLabel: getModel('agnes', session?.role),
+            maskedKey: 'ENV Platform',
+            isActive: !active,
+            isPlatformDefault: true,
+          }]
+        : []),
+      ...keys.map((k) => ({
         provider: k.provider,
         name: AI_PROVIDERS[k.provider]?.name || k.provider,
         modelLabel: AI_PROVIDERS[k.provider]?.modelLabel || 'Otomatis Terbaru',
         maskedKey: k.masked_key,
         isActive: k.is_active,
       })),
+    ];
+
+    return NextResponse.json({
+      success: true,
+      configured: Boolean(active || agnesAvailable),
+      activeSource: active ? 'byok' : (agnesAvailable ? 'agnes' : null),
+      provider: active?.provider || (agnesAvailable ? 'agnes' : null),
+      providerName: providerMeta?.name || (agnesAvailable ? 'Agnes AI (Bawaan .env)' : null),
+      model: resolvedModel,
+      modelLabel: providerMeta?.modelLabel || (agnesAvailable ? 'Agnes Platform Flash' : 'Otomatis Model Terbaru'),
+      maskedKey: active?.masked_key || (agnesAvailable ? 'ENV Platform' : null),
+      savedProviders,
     });
   } catch (err) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
@@ -52,16 +80,41 @@ export async function POST(request) {
     }
 
     const body = await request.json().catch(() => ({}));
-    const keyRecord = await getDecryptedActiveKey(session.uid, body.provider || null);
+    const agnesAvailable = hasAgnesPlatformEngine();
+    const wantsAgnes = String(body.provider || '').trim().toLowerCase() === 'agnes';
+    const keyRecord = wantsAgnes
+      ? null
+      : await getDecryptedActiveKey(session.uid, body.provider || null);
 
-    if (!keyRecord?.apiKey) {
+    let effectiveProvider = null;
+    let effectiveApiKey = null;
+
+    if (wantsAgnes) {
+      if (!agnesAvailable) {
+        return NextResponse.json(
+          { success: false, error: 'Agnes AI bawaan platform belum dikonfigurasi di environment server.' },
+          { status: 400 }
+        );
+      }
+      effectiveProvider = 'agnes';
+    } else if (keyRecord?.apiKey && (body.provider || keyRecord.isActive)) {
+      effectiveProvider = keyRecord.provider;
+      effectiveApiKey = keyRecord.apiKey;
+    } else if (agnesAvailable) {
+      effectiveProvider = 'agnes';
+    } else if (keyRecord?.apiKey) {
+      effectiveProvider = keyRecord.provider;
+      effectiveApiKey = keyRecord.apiKey;
+    }
+
+    if (!effectiveProvider) {
       return NextResponse.json(
         {
           success: false,
           code: 'AI_KEY_REQUIRED',
           requiresApiKey: true,
           action: 'OPEN_AI_SETTINGS',
-          message: 'Anda belum menyimpan API Key AI. Hubungkan API Key Gemini, OpenAI, atau Claude untuk menggunakan Prospekta AI Assistant.',
+          message: 'Belum ada mesin AI aktif. Gunakan Agnes AI bawaan atau simpan API Key Gemini, OpenAI, atau Claude di Pengaturan.',
         },
         { status: 400 }
       );
@@ -71,14 +124,16 @@ export async function POST(request) {
       ? body.messages
       : (body.message ? [{ role: 'user', content: String(body.message) }] : []);
     const uiContext = body.context || {};
-    const requestedModel = await resolveModelForProvider(keyRecord.provider, body.model || 'auto', keyRecord.apiKey, session?.role);
+    const requestedModel = effectiveProvider === 'agnes'
+      ? (body.model || 'auto')
+      : await resolveModelForProvider(effectiveProvider, body.model || 'auto', effectiveApiKey, session?.role);
     const wantsStream = body.stream !== false && request.headers.get('accept')?.includes('application/x-ndjson');
 
     if (!wantsStream) {
       const result = await runAiChatLoop({
         session,
-        provider: keyRecord.provider,
-        apiKey: keyRecord.apiKey,
+        provider: effectiveProvider,
+        apiKey: effectiveApiKey,
         requestedModel,
         messages,
         uiContext,
@@ -95,8 +150,8 @@ export async function POST(request) {
         try {
           const result = await runAiChatLoop({
             session,
-            provider: keyRecord.provider,
-            apiKey: keyRecord.apiKey,
+            provider: effectiveProvider,
+            apiKey: effectiveApiKey,
             requestedModel,
             messages,
             uiContext,

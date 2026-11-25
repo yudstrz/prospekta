@@ -73,8 +73,16 @@ export default function AiAssistantPanel({
     return () => window.removeEventListener('keydown', onKey);
   }, [isOpen, onToggleOpen]);
 
-  const handleProviderSwitch = (nextProvider) => {
+  const handleProviderSwitch = async (nextProvider) => {
     setSelectedProvider(nextProvider);
+    try {
+      const res = await fetch('/api/ai-settings', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: nextProvider }),
+      });
+      if (res.ok) await loadAiStatus();
+    } catch (_) {}
   };
 
   const currentProviderObj = (status.savedProviders || []).find((p) => p.provider === selectedProvider) || null;
@@ -272,7 +280,7 @@ export default function AiAssistantPanel({
             onClick={onOpenAiSettings}
             style={{ minHeight: '36px', fontSize: '0.74rem', padding: '0 10px' }}
           >
-            API Key
+            Agnes / API Key
           </button>
           <button
             type="button"
@@ -303,7 +311,7 @@ export default function AiAssistantPanel({
         </span>
         {status.configured && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-            {status.savedProviders?.length > 1 && (
+            {status.savedProviders?.length > 0 && (
               <select
                 aria-label="Pilih provider aktif"
                 value={selectedProvider}
@@ -311,7 +319,9 @@ export default function AiAssistantPanel({
                 style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-subtle)', borderRadius: '6px', padding: '4px 8px', fontSize: '0.74rem', minHeight: '36px' }}
               >
                 {status.savedProviders.map((sp) => (
-                  <option key={sp.provider} value={sp.provider}>{sp.name} (Latest)</option>
+                  <option key={sp.provider} value={sp.provider}>
+                    {sp.isPlatformDefault ? `${sp.name}` : `${sp.name} (Key Sendiri)`}
+                  </option>
                 ))}
               </select>
             )}

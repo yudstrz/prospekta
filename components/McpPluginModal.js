@@ -42,6 +42,14 @@ export default function McpPluginModal({ onClose, currentSession, onKeysChanged,
   const [providers, setProviders] = useState(DEFAULT_PROVIDERS);
   const [savedKeys, setSavedKeys] = useState([]);
   const [keysLoading, setKeysLoading] = useState(true);
+  const [activeEngine, setActiveEngine] = useState({
+    activeSource: 'agnes',
+    activeProvider: 'agnes',
+    activeProviderName: 'Agnes AI (Bawaan Platform .env)',
+    activeModel: 'gemini-flash-latest',
+    agnesAvailable: true,
+    agnesModel: 'gemini-flash-latest',
+  });
   const [selectedProvider, setSelectedProvider] = useState('gemini');
   const [apiKeyInput, setApiKeyInput] = useState('');
   const [showRawKey, setShowRawKey] = useState(false);
@@ -73,7 +81,15 @@ export default function McpPluginModal({ onClose, currentSession, onKeysChanged,
           setProviders(data.providers);
         }
         setSavedKeys(data.keys || []);
-        if (data.activeProvider) {
+        setActiveEngine({
+          activeSource: data.activeSource || null,
+          activeProvider: data.activeProvider || null,
+          activeProviderName: data.activeProviderName || null,
+          activeModel: data.activeModel || null,
+          agnesAvailable: Boolean(data.agnesAvailable),
+          agnesModel: data.agnesModel || 'gemini-flash-latest',
+        });
+        if (data.activeProvider && data.activeProvider !== 'agnes') {
           setSelectedProvider(data.activeProvider);
         }
       }
@@ -113,6 +129,13 @@ export default function McpPluginModal({ onClose, currentSession, onKeysChanged,
         throw new Error(data.error || 'Gagal menguji atau menyimpan API Key.');
       }
       setSavedKeys(data.keys || []);
+      setActiveEngine((prev) => ({
+        ...prev,
+        activeSource: data.activeSource || 'byok',
+        activeProvider: data.activeProvider || selectedProvider,
+        activeProviderName: data.activeProviderName || prev.activeProviderName,
+        activeModel: data.activeModel || prev.activeModel,
+      }));
       setApiKeyInput('');
       setShowRawKey(false);
       setKeyMsg({ ok: true, text: data.message });
@@ -136,7 +159,14 @@ export default function McpPluginModal({ onClose, currentSession, onKeysChanged,
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'Gagal mengganti provider aktif.');
       setSavedKeys(data.keys || []);
-      setSelectedProvider(provider);
+      setActiveEngine((prev) => ({
+        ...prev,
+        activeSource: data.activeSource || (provider === 'agnes' ? 'agnes' : 'byok'),
+        activeProvider: data.activeProvider || provider,
+        activeProviderName: data.activeProviderName || prev.activeProviderName,
+        activeModel: data.activeModel || prev.activeModel,
+      }));
+      if (provider !== 'agnes') setSelectedProvider(provider);
       setKeyMsg({ ok: true, text: data.message });
       onKeysChanged?.();
     } catch (err) {
@@ -158,6 +188,13 @@ export default function McpPluginModal({ onClose, currentSession, onKeysChanged,
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'Gagal menghapus API Key.');
       setSavedKeys(data.keys || []);
+      setActiveEngine((prev) => ({
+        ...prev,
+        activeSource: data.activeSource || prev.activeSource,
+        activeProvider: data.activeProvider || null,
+        activeProviderName: data.activeProviderName || null,
+        activeModel: data.activeModel || null,
+      }));
       setKeyMsg({ ok: true, text: data.message });
       onKeysChanged?.();
     } catch (err) {
@@ -193,7 +230,7 @@ export default function McpPluginModal({ onClose, currentSession, onKeysChanged,
                 </span>
               </div>
               <p style={{ margin: '4px 0 0', fontSize: '0.8125rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
-                Hubungkan API Key Gemini, OpenAI, atau Claude langsung di akun Anda (enkripsi AES-256-GCM, tanpa konfigurasi file lokal).
+                Pilih mesin AI bawaan platform (Agnes AI dari .env) atau gunakan API Key pribadi Anda (Gemini, OpenAI, atau Claude, terenkripsi AES-256-GCM).
               </p>
             </div>
           </div>
@@ -210,7 +247,7 @@ export default function McpPluginModal({ onClose, currentSession, onKeysChanged,
 
         <div style={{ display: 'flex', gap: '8px', borderBottom: '1px solid var(--border-subtle)', paddingBottom: '0.75rem', marginBottom: '1rem', flexWrap: 'wrap' }}>
           {[
-            { id: 'ai_keys', label: 'Kunci API AI (BYOK)' },
+            { id: 'ai_keys', label: 'Sumber AI & API Key' },
             { id: 'email', label: 'Konektor Email' },
           ].map((tab) => (
             <button
@@ -227,6 +264,91 @@ export default function McpPluginModal({ onClose, currentSession, onKeysChanged,
 
         {activeTab === 'ai_keys' && (
           <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', fontSize: '0.875rem', color: 'var(--text-main)' }}>
+            {/* Pilihan Mode AI: Agnes Platform (.env) vs API Key Sendiri (BYOK) */}
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '10px' }}>
+              <div
+                style={{
+                  padding: '12px',
+                  borderRadius: '10px',
+                  border: activeEngine.activeProvider === 'agnes' ? '1.5px solid var(--primary)' : '1px solid var(--border-subtle)',
+                  background: activeEngine.activeProvider === 'agnes' ? 'rgba(37, 99, 235, 0.08)' : 'var(--bg-app)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  gap: '8px',
+                }}
+              >
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                    <strong style={{ fontSize: '0.85rem' }}>Agnes AI (Bawaan .env)</strong>
+                    <span
+                      style={{
+                        fontSize: '0.68rem',
+                        fontWeight: 700,
+                        padding: '2px 7px',
+                        borderRadius: '9999px',
+                        background: activeEngine.activeProvider === 'agnes' ? 'var(--success-bg)' : 'var(--bg-card)',
+                        color: activeEngine.activeProvider === 'agnes' ? 'var(--success-text)' : 'var(--text-muted)',
+                      }}
+                    >
+                      {activeEngine.activeProvider === 'agnes' ? 'Aktif' : (activeEngine.agnesAvailable ? 'Tersedia' : 'Belum Diatur')}
+                    </span>
+                  </div>
+                  <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
+                    Gunakan AI bawaan platform Prospekta langsung tanpa memasukkan API Key pribadi.
+                  </p>
+                </div>
+                <button
+                  type="button"
+                  className={`btn btn-sm ${activeEngine.activeProvider === 'agnes' ? 'btn-secondary' : 'btn-primary'}`}
+                  disabled={keyBusy || !activeEngine.agnesAvailable || activeEngine.activeProvider === 'agnes'}
+                  onClick={() => handleActivateProvider('agnes')}
+                  style={{ minHeight: '36px', alignSelf: 'flex-start' }}
+                >
+                  {activeEngine.activeProvider === 'agnes' ? 'Sedang Digunakan' : 'Pakai Agnes AI (.env)'}
+                </button>
+              </div>
+
+              <div
+                style={{
+                  padding: '12px',
+                  borderRadius: '10px',
+                  border: activeEngine.activeSource === 'byok' ? '1.5px solid var(--primary)' : '1px solid var(--border-subtle)',
+                  background: activeEngine.activeSource === 'byok' ? 'rgba(37, 99, 235, 0.08)' : 'var(--bg-app)',
+                  display: 'flex',
+                  flexDirection: 'column',
+                  justifyContent: 'space-between',
+                  gap: '8px',
+                }}
+              >
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '6px' }}>
+                    <strong style={{ fontSize: '0.85rem' }}>API Key Sendiri (BYOK)</strong>
+                    <span
+                      style={{
+                        fontSize: '0.68rem',
+                        fontWeight: 700,
+                        padding: '2px 7px',
+                        borderRadius: '9999px',
+                        background: activeEngine.activeSource === 'byok' ? 'var(--success-bg)' : 'var(--bg-card)',
+                        color: activeEngine.activeSource === 'byok' ? 'var(--success-text)' : 'var(--text-muted)',
+                      }}
+                    >
+                      {activeEngine.activeSource === 'byok' ? `Aktif: ${activeEngine.activeProviderName}` : `${savedKeys.length} Tersimpan`}
+                    </span>
+                  </div>
+                  <p style={{ margin: '4px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
+                    Pakai kuota &amp; model Gemini, OpenAI, atau Claude dari akun API Anda sendiri.
+                  </p>
+                </div>
+                <span style={{ fontSize: '0.72rem', color: 'var(--text-muted)' }}>
+                  {savedKeys.length > 0
+                    ? 'Pilih tombol "Aktifkan" pada daftar key di bawah atau tambah key baru.'
+                    : 'Masukkan API Key pada form di bawah ini untuk memakai BYOK.'}
+                </span>
+              </div>
+            </div>
+
             {keyMsg && (
               <div
                 role="status"
@@ -354,7 +476,9 @@ export default function McpPluginModal({ onClose, currentSession, onKeysChanged,
                 <p style={{ margin: 0, fontSize: '0.8125rem', color: 'var(--text-muted)' }}>Memuat status kunci AI...</p>
               ) : savedKeys.length === 0 ? (
                 <div style={{ padding: '14px', borderRadius: '8px', border: '1px dashed var(--border-subtle)', color: 'var(--text-muted)', fontSize: '0.8125rem', textAlign: 'center' }}>
-                  Belum ada API Key yang tersimpan. Simpan minimal 1 key di atas untuk mengaktifkan Prospekta AI Assistant.
+                  {activeEngine.agnesAvailable
+                    ? 'Belum ada API Key pribadi tersimpan. Saat ini Anda memakai Agnes AI bawaan (.env), atau tambah API Key Anda sendiri di form atas.'
+                    : 'Belum ada API Key yang tersimpan. Simpan minimal 1 key di atas untuk mengaktifkan Prospekta AI Assistant.'}
                 </div>
               ) : (
                 <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
