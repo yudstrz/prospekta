@@ -385,6 +385,7 @@ export default function DashboardPage() {
   const [geoSearchOpen, setGeoSearchOpen] = useState(false);
   const reverseGeocodeRef = useRef(null);
   const searchTimeoutRef = useRef(null);
+  const hasInitRadiusRef = useRef(false);
 
   // Derive active anchor safely
   const activeAnchor = anchors.find((a) => a.id === activeAnchorId) || anchors[0] || null;
@@ -471,9 +472,10 @@ export default function DashboardPage() {
           if (data.anchors.some((a) => a.id === curr)) return curr;
           return data.anchors[0].id;
         });
-        setRadiusKm((currRadius) => {
-          return Number(data.anchors[0].radius_default_km) || currRadius || 2;
-        });
+        if (!hasInitRadiusRef.current) {
+          hasInitRadiusRef.current = true;
+          setRadiusKm(Number(data.anchors[0].radius_default_km) || 2);
+        }
       } else if (currentSession?.isSuperadmin) {
         setAnchors(DEFAULT_ANCHORS);
         setActiveAnchorId(DEFAULT_ANCHORS[0].id);
@@ -567,8 +569,9 @@ export default function DashboardPage() {
     if (hasPrebuiltSiteFilter) params.append('has_prebuilt_site', 'true');
     if (hasSentOutreachFilter) params.append('has_sent_outreach', 'true');
     if (onlyPersonalLeads) params.append('is_personal_lead', 'true');
+    if (refreshCounter > 0) params.append('fresh', '1');
 
-    fetch(`/api/places?${params.toString()}`)
+    fetch(`/api/places?${params.toString()}`, refreshCounter > 0 ? { cache: 'no-store' } : undefined)
       .then((res) => res.json())
       .then((data) => {
         if (!isMounted) return;
@@ -640,8 +643,9 @@ export default function DashboardPage() {
     if (hasEmail) mapParams.append('has_email', 'true');
     if (hasPic) mapParams.append('has_pic', 'true');
     if (hasLinkedin) mapParams.append('has_linkedin', 'true');
+    if (refreshCounter > 0) mapParams.append('fresh', '1');
 
-    fetch(`/api/places?${mapParams.toString()}`)
+    fetch(`/api/places?${mapParams.toString()}`, refreshCounter > 0 ? { cache: 'no-store' } : undefined)
       .then((res) => res.json())
       .then((data) => {
         if (!isMounted) return;
@@ -3285,6 +3289,7 @@ export default function DashboardPage() {
           onClose={() => setActiveModal(null)}
           onScanComplete={(scanData) => {
             if (scanData?.radiusKm) {
+              hasInitRadiusRef.current = true;
               setRadiusKm(Number(scanData.radiusKm));
             }
             handleRefresh();

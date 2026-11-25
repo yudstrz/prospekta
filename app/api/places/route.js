@@ -26,6 +26,8 @@ export async function GET(request) {
     const isMapMode = searchParams.get('map_points') === 'true';
     const tid = (await sessionFromRequest(request))?.tid || null;
     const sortBy = searchParams.get('sort_by') || 'distance_m';
+    const bypassCache = searchParams.get('fresh') === '1' || searchParams.has('_t');
+    const cacheTtl = bypassCache ? 0 : 15000;
     const order = (searchParams.get('order') || 'ASC').toUpperCase() === 'DESC' ? 'DESC' : 'ASC';
     const limit = Math.min(Math.max(parseInt(searchParams.get('limit') || '50', 10), 1), 200);
     const offset = Math.max(parseInt(searchParams.get('offset') || '0', 10), 0);
@@ -259,7 +261,7 @@ export async function GET(request) {
         ORDER BY distance_m ASC
         LIMIT ?;
       `;
-      const mapRes = await cachedExecute({ sql: mapSql, args: [...args, mapLimit] }, 60000);
+      const mapRes = await cachedExecute({ sql: mapSql, args: [...args, mapLimit] }, bypassCache ? 0 : 15000);
       let mapPlaces = mapRes.rows || [];
       if (mapPlaces.length > 0) {
         const placeIds = mapPlaces.map((p) => p.overture_id).filter(Boolean);
@@ -279,7 +281,9 @@ export async function GET(request) {
         success: true,
         places: mapPlaces
       }, {
-        headers: { 'Cache-Control': 'private, max-age=30, stale-while-revalidate=60' }
+        headers: {
+          'Cache-Control': bypassCache ? 'no-store' : 'private, max-age=10, stale-while-revalidate=20'
+        }
       });
     }
 
@@ -400,10 +404,10 @@ export async function GET(request) {
     const dataArgs = [...args, limit, offset];
 
     const [countRes, globalCountRes, dataRes] = await Promise.all([
-      cachedExecute({ sql: countSql, args }, 60000),
+      cachedExecute({ sql: countSql, args }, cacheTtl),
       // Query hitungan metrik tenant atau global Prospekta sesuai tLogFilter / tOverlayFilter
-      cachedExecute({ sql: globalCountSql, args: globalCountArgs }, 60000),
-      cachedExecute({ sql: dataSql, args: dataArgs }, 45000)
+      cachedExecute({ sql: globalCountSql, args: globalCountArgs }, cacheTtl),
+      cachedExecute({ sql: dataSql, args: dataArgs }, cacheTtl)
     ]);
 
     const statsRow = countRes.rows[0] || {};
