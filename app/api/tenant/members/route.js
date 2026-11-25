@@ -50,8 +50,8 @@ export async function POST(request) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
-    // Hanya client_admin atau superadmin yang boleh menambah staf
-    if (session.role !== 'client_admin' && !isSuperadmin(session)) {
+    // Hanya admin atau superadmin yang boleh menambah anggota tim
+    if (session.role !== 'admin' && session.role !== 'client_admin' && !isSuperadmin(session)) {
       return NextResponse.json({ success: false, error: 'Hanya Admin yang dapat mengundang anggota tim.' }, { status: 403 });
     }
 
@@ -63,7 +63,8 @@ export async function POST(request) {
     const body = await request.json().catch(() => ({}));
     const email = String(body.email || '').trim().toLowerCase();
     const password = String(body.password || '').trim();
-    const role = body.role === 'client_admin' ? 'client_admin' : 'client_sales';
+    const rawRole = String(body.role || '').trim().toLowerCase();
+    const role = (rawRole === 'admin' || rawRole === 'client_admin') ? 'admin' : 'user';
 
     if (!email || !/^\S+@\S+\.\S+$/.test(email)) {
       return NextResponse.json({ success: false, error: 'Alamat email tidak valid.' }, { status: 400 });
@@ -115,7 +116,7 @@ export async function DELETE(request) {
       return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
     }
 
-    if (session.role !== 'client_admin' && !isSuperadmin(session)) {
+    if (session.role !== 'admin' && session.role !== 'client_admin' && !isSuperadmin(session)) {
       return NextResponse.json({ success: false, error: 'Hanya Admin yang dapat menghapus anggota tim.' }, { status: 403 });
     }
 

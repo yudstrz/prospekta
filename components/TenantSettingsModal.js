@@ -30,7 +30,8 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
   // Team state
   const [members, setMembers] = useState([]);
   const [loadingMembers, setLoadingMembers] = useState(false);
-  const [newMember, setNewMember] = useState({ email: '', password: '', role: 'client_sales' });
+  const [newMember, setNewMember] = useState({ email: '', password: '', role: 'user' });
+  const [showMemberPassword, setShowMemberPassword] = useState(false);
   const [addingMember, setAddingMember] = useState(false);
   const [memberMsg, setMemberMsg] = useState(null);
 
@@ -168,7 +169,8 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || 'Gagal menambahkan anggota.');
       setMemberMsg({ type: 'success', text: `Anggota ${newMember.email} berhasil ditambahkan.` });
-      setNewMember({ email: '', password: '', role: 'client_sales' });
+      setNewMember({ email: '', password: '', role: 'user' });
+      setShowMemberPassword(false);
       fetchMembers();
     } catch (err) {
       setMemberMsg({ type: 'error', text: err.message });
@@ -1584,35 +1586,62 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                       <span style={{ fontSize: '0.8rem', fontWeight: 600, display: 'block', marginBottom: '8px' }}>
                         + Tambah Anggota Tim Baru
                       </span>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: '8px' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(150px, 1fr))', gap: '8px', alignItems: 'center' }}>
                         <input
                           type="email"
+                          name="new_member_email"
+                          autoComplete="off"
                           placeholder="email@tim.com"
                           value={newMember.email}
                           onChange={(e) => setNewMember({ ...newMember, email: e.target.value })}
-                          style={{ height: '36px', padding: '0 10px', borderRadius: '4px', border: '1px solid var(--border-subtle)', fontSize: '0.8rem', backgroundColor: 'var(--bg-card)', color: 'var(--text-main)' }}
+                          style={{ minHeight: '38px', padding: '0 10px', borderRadius: '6px', border: '1px solid var(--border-subtle)', fontSize: '0.8rem', backgroundColor: 'var(--bg-card)', color: 'var(--text-main)' }}
                         />
-                        <input
-                          type="password"
-                          placeholder="Password"
-                          value={newMember.password}
-                          onChange={(e) => setNewMember({ ...newMember, password: e.target.value })}
-                          style={{ height: '36px', padding: '0 10px', borderRadius: '4px', border: '1px solid var(--border-subtle)', fontSize: '0.8rem', backgroundColor: 'var(--bg-card)', color: 'var(--text-main)' }}
-                        />
+                        <div style={{ display: 'flex', alignItems: 'center', position: 'relative' }}>
+                          <input
+                            type={showMemberPassword ? 'text' : 'password'}
+                            name="new_member_password"
+                            autoComplete="new-password"
+                            placeholder="Password min. 8 karakter"
+                            value={newMember.password}
+                            onChange={(e) => setNewMember({ ...newMember, password: e.target.value })}
+                            style={{ width: '100%', minHeight: '38px', padding: '0 58px 0 10px', borderRadius: '6px', border: '1px solid var(--border-subtle)', fontSize: '0.8rem', backgroundColor: 'var(--bg-card)', color: 'var(--text-main)' }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowMemberPassword((prev) => !prev)}
+                            aria-label={showMemberPassword ? 'Sembunyikan password' : 'Lihat password'}
+                            style={{
+                              position: 'absolute',
+                              right: '4px',
+                              minHeight: '30px',
+                              padding: '0 8px',
+                              border: 'none',
+                              borderRadius: '4px',
+                              backgroundColor: 'var(--bg-app)',
+                              color: 'var(--accent-text)',
+                              fontSize: '0.72rem',
+                              fontWeight: 600,
+                              cursor: 'pointer',
+                            }}
+                          >
+                            {showMemberPassword ? 'Tutup' : 'Lihat'}
+                          </button>
+                        </div>
                         <select
                           value={newMember.role}
                           onChange={(e) => setNewMember({ ...newMember, role: e.target.value })}
-                          style={{ height: '36px', padding: '0 6px', borderRadius: '4px', border: '1px solid var(--border-subtle)', fontSize: '0.8rem', backgroundColor: 'var(--bg-card)', color: 'var(--text-main)' }}
+                          aria-label="Tipe akun anggota"
+                          style={{ minHeight: '38px', padding: '0 8px', borderRadius: '6px', border: '1px solid var(--border-subtle)', fontSize: '0.8rem', backgroundColor: 'var(--bg-card)', color: 'var(--text-main)' }}
                         >
-                          <option value="client_sales">Sales Staff</option>
-                          <option value="client_admin">Admin</option>
+                          <option value="user">User</option>
+                          <option value="admin">Admin</option>
                         </select>
                         <button
                           type="button"
                           onClick={handleAddMember}
                           disabled={addingMember}
                           className="btn btn-primary"
-                          style={{ height: '36px', fontSize: '0.8rem', padding: '0 8px' }}
+                          style={{ minHeight: '38px', fontSize: '0.8rem', padding: '0 12px', fontWeight: 600 }}
                         >
                           {addingMember ? 'Menambah...' : 'Tambah'}
                         </button>
@@ -1626,39 +1655,41 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                       ) : members.length === 0 ? (
                         <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>Belum ada anggota tim lain.</div>
                       ) : (
-                        members.map((m) => (
-                          <div
-                            key={m.id}
-                            style={{
-                              display: 'flex',
-                              alignItems: 'center',
-                              justifyContent: 'space-between',
-                              padding: '10px 12px',
-                              borderRadius: '6px',
-                              border: '1px solid var(--border-subtle)',
-                              backgroundColor: 'var(--bg-app)',
-                            }}
-                          >
-                            <div>
-                              <span style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600 }}>{m.email}</span>
-                              <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                                Ditambahkan: {new Date(m.created_at).toLocaleDateString('id-ID')}
-                              </span>
-                            </div>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                              <span
-                                style={{
-                                  fontSize: '0.7rem',
-                                  padding: '2px 8px',
-                                  borderRadius: '10px',
-                                  backgroundColor: m.role === 'client_admin' ? 'var(--accent-light)' : 'var(--bg-card-subtle)',
-                                  color: m.role === 'client_admin' ? 'var(--accent-text)' : 'var(--text-muted)',
-                                  fontWeight: 600,
-                                }}
-                              >
-                                {m.role === 'client_admin' ? 'Admin' : 'Sales Staff'}
-                              </span>
-                              {m.role !== 'client_admin' && (
+                        members.map((m) => {
+                          const isMemberAdmin = m.role === 'admin' || m.role === 'client_admin' || m.role === 'superadmin';
+                          return (
+                            <div
+                              key={m.id}
+                              style={{
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'space-between',
+                                padding: '10px 12px',
+                                borderRadius: '6px',
+                                border: '1px solid var(--border-subtle)',
+                                backgroundColor: 'var(--bg-app)',
+                              }}
+                            >
+                              <div>
+                                <span style={{ display: 'block', fontSize: '0.85rem', fontWeight: 600 }}>{m.email}</span>
+                                <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                                  Ditambahkan: {new Date(m.created_at).toLocaleDateString('id-ID')}
+                                </span>
+                              </div>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                                <span
+                                  style={{
+                                    fontSize: '0.7rem',
+                                    padding: '2px 8px',
+                                    borderRadius: '10px',
+                                    backgroundColor: isMemberAdmin ? 'var(--accent-light)' : 'var(--bg-card-subtle)',
+                                    color: isMemberAdmin ? 'var(--accent-text)' : 'var(--text-muted)',
+                                    fontWeight: 600,
+                                  }}
+                                >
+                                  {isMemberAdmin ? 'Admin' : 'User'}
+                                </span>
+                                {!isMemberAdmin && (
                                 <button
                                   type="button"
                                   onClick={() => handleDeleteMember(m.id, m.email)}
@@ -1678,7 +1709,8 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                               )}
                             </div>
                           </div>
-                        ))
+                          );
+                        })
                       )}
                     </div>
                   </div>
