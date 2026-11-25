@@ -29,6 +29,8 @@ const CLIENT_ROUTES = [
   '/api/sync/',
   '/api/crawl',
   '/api/mcp/',
+  '/api/ai-settings',
+  '/api/ai-chat',
 ];
 const CLIENT_DENY_ROUTES = [
   '/api/reach/webmail',
