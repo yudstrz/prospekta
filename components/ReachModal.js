@@ -680,7 +680,9 @@ export default function ReachModal({ place: initialPlace, onClose, onUpdatePlace
     const targetLoc = place.city || (
       place.anchor?.includes('SG') || place.anchor?.includes('Prestige') || place.address?.includes('Singapore') || place.phone?.startsWith('+65')
         ? 'Singapore'
-        : (place.anchor?.includes('Jakarta') || place.anchor?.includes('Denpasar') || isTargetIndonesia ? 'Jakarta' : 'Singapore')
+        : (place.anchor?.includes('Surabaya') || /surabaya|jawa timur/i.test(place.address || '')
+            ? 'Surabaya'
+            : (place.anchor?.includes('Jakarta') || place.anchor?.includes('Denpasar') || isTargetIndonesia ? 'Jakarta' : 'Singapore'))
     );
 
     try {
@@ -1095,7 +1097,9 @@ export default function ReachModal({ place: initialPlace, onClose, onUpdatePlace
   const cleanTargetLoc = place.city || (
     place.anchor?.includes('SG') || place.anchor?.includes('Prestige') || place.address?.includes('Singapore') || place.phone?.startsWith('+65')
       ? 'Singapore'
-      : (place.anchor?.includes('Jakarta') || place.anchor?.includes('Denpasar') || isTargetIndonesia ? 'Jakarta' : 'Singapore')
+      : (place.anchor?.includes('Surabaya') || /surabaya|jawa timur/i.test(place.address || '')
+          ? 'Surabaya'
+          : (place.anchor?.includes('Jakarta') || place.anchor?.includes('Denpasar') || isTargetIndonesia ? 'Jakarta' : 'Singapore'))
   );
 
   // Dynamic Workspace Sender & Personalization (Strict White-Labeling)
