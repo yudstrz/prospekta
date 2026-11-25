@@ -20,11 +20,71 @@ const OFFER_ANGLES = [
   { value: 'agentic_ai', label: 'AI Agent & Automation' }
 ];
 const SG_PICS = [];
-const buildSgExecutiveEmail = () => ({ subject: '', body: '', angle: '' });
-const buildLinkedInMessages = () => ({ connectionMessage: '', followUpMessage: '' });
-const getAdvancedDorkScenarios = () => [];
+const buildSgExecutiveEmail = ({
+  companyName = '',
+  dmName = '',
+  location = '',
+  lang = 'id',
+  senderName = 'Tim Bisnis',
+  senderCompany = 'Prospekta',
+  companyOffering = '',
+  previewUrl = '',
+  includePreviewLink = false,
+  customCta = '',
+  manualSubjectTemplate = '',
+  manualBodyTemplate = '',
+} = {}) => {
+  const greeting = dmName ? `Halo ${dmName},` : (lang === 'en' ? `Hi ${companyName || 'Team'},` : `Halo tim ${companyName || ''},`);
+  const offer = companyOffering ? companyOffering.slice(0, 140) : (lang === 'en' ? 'practical website and digital workflow updates' : 'penataan website dan alur komunikasi digital');
+  const previewLine = includePreviewLink && previewUrl ? `\nContoh konsep awal untuk ${companyName}: ${previewUrl}` : '';
+  const ctaLine = customCta || (lang === 'en' ? 'Open to a brief 10-minute chat this week?' : 'Bolehkah kami kirim ringkasan singkatnya minggu ini?');
+  const subject = manualSubjectTemplate
+    ? manualSubjectTemplate.replace(/\{\{company\}\}/gi, companyName)
+    : (lang === 'en' ? `Quick note for ${companyName || 'your team'}` : `Singkat untuk tim ${companyName || 'Anda'}`);
+  const body = manualBodyTemplate
+    ? manualBodyTemplate.replace(/\{\{company\}\}/gi, companyName)
+    : `${greeting}\n\nSaya ${senderName} dari ${senderCompany}${location ? ` (${location})` : ''}. Kami membantu bisnis sejenis dalam ${offer}.${previewLine}\n\n${ctaLine}\n\nTerima kasih,\n${senderName}`;
+  return { subject, body, angle: 'digital_structure' };
+};
+const buildLinkedInMessages = ({ companyName = '', dmName = '', location = '', lang = 'id', senderName = 'Tim Bisnis', senderCompany = 'Prospekta' } = {}) => {
+  const first = dmName ? dmName.split(' ')[0] : '';
+  const stage1 = lang === 'en'
+    ? `Hi${first ? ' ' + first : ''}, nice seeing what ${companyName || 'your team'} is building${location ? ' in ' + location : ''}. Would love to connect here.`
+    : `Halo${first ? ' ' + first : ''}, salam kenal dari ${senderName} (${senderCompany}). Senang melihat perkembangan ${companyName || 'bisnis Anda'}. Boleh terhubung di sini?`;
+  const stage2 = lang === 'en'
+    ? `Thanks for connecting${first ? ', ' + first : ''}. Happy to share a concise concept note for ${companyName || 'your team'} if helpful.`
+    : `Terima kasih sudah terhubung${first ? ', ' + first : ''}. Jika berkenan, saya bisa bagikan catatan ringkas yang relevan untuk ${companyName || 'tim Anda'}.`;
+  return { stage1, stage2, connectionMessage: stage1, followUpMessage: stage2 };
+};
+const getAdvancedDorkScenarios = (place = {}, isTargetIndonesia = false) => {
+  const name = String(place?.name || '').trim() || 'Perusahaan';
+  const region = isTargetIndonesia ? 'Indonesia' : (place?.city || 'Singapore');
+  return [
+    {
+      id: 'dm_linkedin',
+      title: 'LinkedIn Pimpinan / Decision Maker',
+      desc: 'Cari Founder, CEO, atau Director di LinkedIn.',
+      query: `site:linkedin.com/in "${name}" "${region}" CEO OR Founder OR Director`,
+    },
+    {
+      id: 'mgr_linkedin',
+      title: 'LinkedIn Manager / Head',
+      desc: 'Cari Manajer operasional, HR, atau marketing terkait.',
+      query: `site:linkedin.com/in "${name}" "${region}" Manager OR Head`,
+    },
+    {
+      id: 'contact_email',
+      title: 'Halaman Kontak & Email Publik',
+      desc: 'Cari halaman kontak resmi atau email bisnis.',
+      query: `"${name}" "${region}" email OR contact OR hubungi`,
+    },
+  ];
+};
 const suggestPicCluster = () => '';
-const resolveOutreachStrategy = () => ({ strategy: 'default' });
+const resolveOutreachStrategy = (place = {}) => ({
+  strategy: place?.website ? 'modernize' : 'digital_structure',
+  angle: place?.website ? 'agentic_ai' : 'digital_structure',
+});
 import ProposalViewer from './ProposalViewer';
 import { getPhoneType, getWhatsAppUrl } from '@/lib/phone';
 import { copyToClipboard } from '@/lib/clipboard';
@@ -1287,7 +1347,7 @@ export default function ReachModal({ place: initialPlace, onClose, onUpdatePlace
                           <>
                             <div style={{ display: 'inline-flex', borderRadius: 'var(--radius-sm)', overflow: 'hidden' }}>
                               <a
-                                href={`https://www.google.com/search?q=${encodeURIComponent(dorkScenarios[0].query)}`}
+                                href={`https://www.google.com/search?q=${encodeURIComponent(dorkScenarios[0]?.query || place.name || '')}`}
                                 target="_blank"
                                 rel="noreferrer"
                                 className="btn btn-secondary btn-sm"

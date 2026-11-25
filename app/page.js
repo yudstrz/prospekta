@@ -1185,7 +1185,7 @@ export default function DashboardPage() {
                 )}
               </div>
               <p style={{ margin: 0, fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                {tx('Context referenced by AI for drafting proposals, audits, and MCP agent responses.', 'Acuan konteks yang dibaca agen AI untuk merancang proposal, audit web, dan konektor MCP.')}
+                {tx('Context referenced by AI for drafting proposals, audits, and AI Assistant responses.', 'Acuan konteks yang dibaca AI untuk merancang proposal, audit web, dan respons AI Assistant.')}
               </p>
             </div>
           </div>
@@ -1292,7 +1292,7 @@ export default function DashboardPage() {
                 <button
                   type="button"
                   onClick={() => setIsCrawlerOpen(true)}
-                  style={{ background: 'none', border: 'none', color: 'var(--primary)', fontSize: '0.7rem', cursor: 'pointer', padding: 0, fontWeight: 600 }}
+                  style={{ background: 'none', border: 'none', color: 'var(--accent-text)', fontSize: '0.72rem', cursor: 'pointer', minHeight: '34px', padding: '0 6px', fontWeight: 600 }}
                 >
                   + Kelola Tautan
                 </button>
@@ -2018,11 +2018,10 @@ export default function DashboardPage() {
             type="button"
             className="prospekta-chip"
             onClick={() => setActiveModal('mcp_plugin')}
-            style={{ borderColor: 'rgba(37, 99, 235, 0.4)', color: 'var(--primary)', fontWeight: 600 }}
-            title={tx('Connect AI agent with Prospekta MCP Plugin', 'Hubungkan AI agent dengan Plugin MCP Prospekta')}
+            style={{ borderColor: 'var(--border-focus)', color: 'var(--accent-text)', fontWeight: 600 }}
+            title={tx('Manage AI API Key (BYOK) & Email Connector', 'Kelola API Key AI (BYOK) & Konektor Email')}
           >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-            <span>{tx('MCP Agent Hub', 'Hub Plugin MCP')}</span>
+            <span>{tx('AI Key & Email', 'Integrasi AI & Email')}</span>
           </button>
 
           <button
@@ -2296,6 +2295,7 @@ export default function DashboardPage() {
                     onClick={() => setTableLayout('compact')}
                     style={{
                       padding: '4px 10px',
+                      minHeight: '32px',
                       fontSize: '0.75rem',
                       fontWeight: tableLayout === 'compact' ? 600 : 400,
                       background: tableLayout === 'compact' ? 'var(--primary)' : 'transparent',
@@ -2312,6 +2312,7 @@ export default function DashboardPage() {
                     onClick={() => setTableLayout('split')}
                     style={{
                       padding: '4px 10px',
+                      minHeight: '32px',
                       fontSize: '0.75rem',
                       fontWeight: tableLayout === 'split' ? 600 : 400,
                       background: tableLayout === 'split' ? 'var(--primary)' : 'transparent',

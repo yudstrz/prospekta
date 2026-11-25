@@ -2855,12 +2855,13 @@ tbody tr:hover {
   display: inline-flex;
   align-items: center;
   gap: 5px;
+  min-height: 32px;
   font-size: 0.75rem;
   font-weight: 600;
   color: var(--success-text);
   background-color: var(--success-bg);
   border: 1px solid var(--success-border);
-  padding: 2px 8px;
+  padding: 4px 10px;
   border-radius: 9999px;
 }
 

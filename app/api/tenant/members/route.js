@@ -10,7 +10,7 @@ async function resolveTenantId(session, request) {
   if (!session) return null;
   if (isSuperadmin(session)) {
     const url = new URL(request.url);
-    return url.searchParams.get('tenant_id') || null;
+    return url.searchParams.get('tenant_id') || session.tid || 'tnt_master';
   }
   return session.tid || null;
 }
