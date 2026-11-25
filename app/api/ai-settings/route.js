@@ -56,7 +56,7 @@ export async function POST(request) {
       return NextResponse.json({ success: false, error: 'API Key wajib diisi.' }, { status: 400 });
     }
 
-    const testRes = await testProviderConnection(provider, apiKey);
+    const testRes = await testProviderConnection(provider, apiKey, session?.role);
     if (body.testOnly) {
       return NextResponse.json({
         success: true,

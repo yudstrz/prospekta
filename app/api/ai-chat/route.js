@@ -20,7 +20,7 @@ export async function GET(request) {
     if (active) {
       const dec = await getDecryptedActiveKey(session.uid, active.provider).catch(() => null);
       if (dec?.apiKey) {
-        resolvedModel = await resolveLatestModel(active.provider, dec.apiKey).catch(() => providerMeta?.fallbackModel || null);
+        resolvedModel = await resolveLatestModel(active.provider, dec.apiKey, false, session?.role).catch(() => providerMeta?.fallbackModel || null);
       }
     }
     return NextResponse.json({
@@ -71,7 +71,7 @@ export async function POST(request) {
       ? body.messages
       : (body.message ? [{ role: 'user', content: String(body.message) }] : []);
     const uiContext = body.context || {};
-    const requestedModel = await resolveModelForProvider(keyRecord.provider, body.model || 'auto', keyRecord.apiKey);
+    const requestedModel = await resolveModelForProvider(keyRecord.provider, body.model || 'auto', keyRecord.apiKey, session?.role);
     const wantsStream = body.stream !== false && request.headers.get('accept')?.includes('application/x-ndjson');
 
     if (!wantsStream) {
