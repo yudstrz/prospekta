@@ -125,8 +125,8 @@ export async function POST(request) {
 
   if (body.action === 'connect_mcp') {
     const accountEmail = (body.email || session.email || '').trim().toLowerCase();
-    if (!accountEmail || !accountEmail.includes('@')) {
-      return NextResponse.json({ success: false, error: 'Alamat email Gmail tidak valid.' }, { status: 400 });
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(accountEmail)) {
+      return NextResponse.json({ success: false, error: 'Alamat email tidak valid.' }, { status: 400 });
     }
     await saveSettings(tid, {
       email_provider_mode: 'gmail_mcp',
@@ -135,7 +135,7 @@ export async function POST(request) {
     });
     return NextResponse.json({
       success: true,
-      message: `Akun ${accountEmail} berhasil dihubungkan via protokol MCP Gmail (One-Click Connector).`,
+      message: `Email ${accountEmail} berhasil terhubung. Balasan penerima otomatis diarahkan ke ${accountEmail}.`,
       settings: await getPublicSettings(tid),
     });
   }
@@ -147,7 +147,7 @@ export async function POST(request) {
     });
     return NextResponse.json({
       success: true,
-      message: 'Koneksi MCP Gmail telah diputus. Mode pengiriman dialihkan kembali ke SMTP.',
+      message: 'Koneksi email cepat telah diputus. Mode pengiriman dialihkan kembali ke SMTP.',
       settings: await getPublicSettings(tid),
     });
   }
@@ -155,42 +155,51 @@ export async function POST(request) {
   if (body.action === 'test_mcp') {
     try {
       const stored = (await getSettings(tid)) || {};
-      const targetEmail = (body.target_email || session.email || 'wahyudiz6172@gmail.com').trim().toLowerCase();
-      if (!targetEmail) {
-        return NextResponse.json({ success: false, error: 'Alamat email tujuan belum diisi.' }, { status: 400 });
+      const targetEmail = (body.target_email || session.email || '').trim().toLowerCase();
+      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(targetEmail)) {
+        return NextResponse.json({ success: false, error: 'Alamat email penerima tujuan belum valid.' }, { status: 400 });
       }
-      const senderEmail = (stored.email_provider_mode === 'gmail_mcp' && stored.gmail_mcp_account)
+      const isQuickMode = stored.email_provider_mode === 'gmail_mcp' && stored.gmail_mcp_account;
+      const senderEmail = isQuickMode
         ? stored.gmail_mcp_account
-        : (body.sender_email || 'admin@prospekta.id');
+        : (stored.smtp_from || stored.smtp_user || body.sender_email || process.env.SMTP_FROM || 'admin@prospekta.id');
       const compName = stored.company_name || 'Prospekta';
-      const senderName = body.from_name || (senderEmail.includes('wahyudi') ? `Wahyudi | ${compName}` : compName);
+      const senderName = (body.from_name || '').trim() || `${senderEmail} (${compName})`;
+      const esc = (v) => String(v || '').replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
-      await sendEmail({
+      const sent = await sendEmail({
         to: targetEmail,
-        subject: `[Uji Coba Email] Dari ${senderName}`,
+        subject: `[Uji Coba Konektor Email] Dari ${senderEmail}`,
         fromName: senderName,
         fromEmail: senderEmail,
         replyTo: senderEmail,
         tenantId: tid,
-        text: `Halo Wahyudi,\n\nIni adalah email konfirmasi pengujian pengiriman dari ${senderName} (${senderEmail}) ke alamat Anda (${targetEmail}).\n\nKoneksi berhasil dan siap digunakan!`,
+        text: `Halo,\n\nIni adalah email uji coba pengiriman dari ${compName}.\nIdentitas Pengirim & Reply-To: ${senderEmail}\nPenerima Tujuan: ${targetEmail}\n\nJika Anda membalas email ini, balasan akan otomatis masuk ke ${senderEmail}.`,
         html: `<div style="font-family:sans-serif;padding:20px;border:1px solid #e2e8f0;border-radius:8px;max-width:540px">
-          <h3 style="color:#2563eb;margin-top:0">Konfirmasi Integrasi Email Berhasil</h3>
-          <p>Halo Wahyudi,</p>
-          <p>Email ini dikirimkan sebagai verifikasi koneksi antara workspace <strong>${compName}</strong> dan layanan email pengirim.</p>
+          <h3 style="color:#2563eb;margin-top:0">Konfirmasi Konektor Email Aktif</h3>
+          <p>Halo,</p>
+          <p>Email ini dikirim untuk memverifikasi konektor email workspace <strong>${esc(compName)}</strong>.</p>
           <div style="background:#f1f5f9;padding:14px;border-radius:6px;font-size:14px;margin:16px 0;line-height:1.6">
-            <strong>Nama Pengirim:</strong> ${senderName}<br/>
-            <strong>Email Pengirim (From):</strong> ${senderEmail}<br/>
-            <strong>Email Penerima (To):</strong> ${targetEmail}<br/>
-            <strong>Alamat Balasan (Reply-To):</strong> ${senderEmail}<br/>
-            <strong>Status:</strong> Terhubung dan Aktif
+            <strong>Nama Tampilan Pengirim:</strong> ${esc(senderName)}<br/>
+            <strong>Identitas Email / Reply-To:</strong> ${esc(senderEmail)}<br/>
+            <strong>Email Penerima (To):</strong> ${esc(targetEmail)}
           </div>
-          <p style="color:#64748b;font-size:12px;margin-bottom:0">${compName} &bull; Sistem Otomasi Outreach B2B</p>
+          <p style="font-size:13px;color:#334155">Balas email ini untuk memastikan balasan langsung masuk ke kotak masuk <strong>${esc(senderEmail)}</strong>.</p>
+          <p style="color:#64748b;font-size:12px;margin-bottom:0">${esc(compName)} &bull; Prospekta MCP Hub</p>
         </div>`,
         saveToSent: false,
       });
       return NextResponse.json({
         success: true,
-        message: `Email verifikasi pengujian berhasil dikirim dari ${senderName} (${senderEmail}) ke ${targetEmail}.`,
+        message: `Email uji coba terkirim ke ${targetEmail} (Identitas & Reply-To: ${sent.replyTo || senderEmail}, Relay: ${sent.fromEmail}).`,
+        meta: {
+          mode: stored.email_provider_mode || 'smtp',
+          displaySender: senderEmail,
+          envelopeFrom: sent.fromEmail,
+          replyTo: sent.replyTo || senderEmail,
+          to: targetEmail,
+          provider: sent.provider,
+        },
       });
     } catch (err) {
       return NextResponse.json({ success: false, error: `Gagal mengirim email uji coba: ${err.message}` }, { status: 500 });

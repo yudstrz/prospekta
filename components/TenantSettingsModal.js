@@ -340,9 +340,7 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'test_mcp',
-          target_email: settings.gmail_mcp_account || 'yourname@gmail.com',
-          target_email: (testRecipientInput || 'wahyudiz6172@gmail.com').trim(),
-          from_name: 'Tim Prospekta',
+          target_email: (testRecipientInput || settings.gmail_mcp_account || '').trim(),
         }),
       });
       const data = await res.json();
@@ -1335,7 +1333,7 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                               </label>
                               <input
                                 type="email"
-                                placeholder="wahyudiz6172@gmail.com"
+                                placeholder="mis. penerima@gmail.com"
                                 value={testRecipientInput}
                                 onChange={(e) => setTestRecipientInput(e.target.value)}
                                 style={{
@@ -1351,7 +1349,7 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                                 }}
                               />
                               <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginTop: '3px' }}>
-                                Tujuan default: wahyudiz6172@gmail.com
+                                Kosongkan untuk mengirim ke email akun yang sedang login.
                               </span>
                             </div>
 
@@ -1443,10 +1441,10 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                               Alamat Server Email (SMTP Host) <span style={{ color: '#ef4444' }}>*</span>
                             </label>
                             <input
-                              type="email"
-                              placeholder="yourname@gmail.com"
-                              value={testRecipientInput}
-                              onChange={(e) => setTestRecipientInput(e.target.value)}
+                              type="text"
+                              placeholder="smtp.gmail.com atau mail.domainanda.com"
+                              value={settings.smtp_host || ''}
+                              onChange={(e) => setSettings({ ...settings, smtp_host: e.target.value })}
                               style={{
                                 width: '100%',
                                 height: '40px',
@@ -1460,7 +1458,7 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                               }}
                             />
                             <span style={{ fontSize: '0.7rem', color: 'var(--text-muted)', display: 'block', marginTop: '3px' }}>
-                              Alamat email tujuan penerima uji coba
+                              Misal: smtp.gmail.com atau mail.prospekta.id
                             </span>
                           </div>
                           <div>

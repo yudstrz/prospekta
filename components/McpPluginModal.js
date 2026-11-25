@@ -20,6 +20,11 @@ export default function McpPluginModal({ onClose, currentSession }) {
   const [activeTab, setActiveTab] = useState('tokens');
 
   const [emailConn, setEmailConn] = useState({
+    mode: 'gmail_mcp',
+    mcpEmail: '',
+    mcpAccount: '',
+    mcpConnected: false,
+    testTo: '',
     email_address: '',
     smtp_host: 'smtp.gmail.com',
     smtp_port: 587,
@@ -27,6 +32,7 @@ export default function McpPluginModal({ onClose, currentSession }) {
     passwordSet: false,
   });
   const [emailSaving, setEmailSaving] = useState(false);
+  const [emailTesting, setEmailTesting] = useState(false);
   const [emailMsg, setEmailMsg] = useState(null);
 
   const role = currentSession?.role || 'user';
@@ -63,20 +69,31 @@ export default function McpPluginModal({ onClose, currentSession }) {
     }
   };
 
+  const applyEmailSettings = (s) => {
+    if (!s) return;
+    setEmailConn((prev) => ({
+      ...prev,
+      mode: s.email_provider_mode === 'gmail_mcp'
+        ? 'gmail_mcp'
+        : (s.email_provider_mode === 'smtp' ? 'smtp' : prev.mode),
+      mcpEmail: s.gmail_mcp_account || prev.mcpEmail || '',
+      mcpAccount: s.gmail_mcp_account || '',
+      mcpConnected: Boolean(s.gmail_mcp_connected && s.gmail_mcp_account),
+      email_address: s.smtp_from || s.smtp_user || '',
+      smtp_host: s.smtp_host || 'smtp.gmail.com',
+      smtp_port: Number(s.smtp_port) || 587,
+      password: '',
+      passwordSet: Boolean(s.smtp_pass_set),
+    }));
+  };
+
   const fetchEmailSettings = async () => {
     try {
       const res = await fetch('/api/settings');
       if (!res.ok) return;
       const data = await res.json();
       if (data.success && data.settings) {
-        const s = data.settings;
-        setEmailConn((prev) => ({
-          ...prev,
-          email_address: s.smtp_from || s.smtp_user || '',
-          smtp_host: s.smtp_host || 'smtp.gmail.com',
-          smtp_port: Number(s.smtp_port) || 587,
-          passwordSet: Boolean(s.smtp_pass_set),
-        }));
+        applyEmailSettings(data.settings);
       }
     } catch (_) {}
   };
@@ -125,6 +142,7 @@ export default function McpPluginModal({ onClose, currentSession }) {
     setEmailMsg(null);
     try {
       const payload = {
+        email_provider_mode: 'smtp',
         smtp_host: emailConn.smtp_host.trim(),
         smtp_port: Number(emailConn.smtp_port) || 587,
         smtp_user: emailConn.email_address.trim(),
@@ -142,12 +160,37 @@ export default function McpPluginModal({ onClose, currentSession }) {
       if (!res.ok || !data.success) {
         throw new Error(data.error || 'Gagal menyimpan pengaturan SMTP.');
       }
-      setEmailConn((prev) => ({ ...prev, password: '', passwordSet: Boolean(data.settings?.smtp_pass_set ?? prev.passwordSet) }));
-      setEmailMsg({ ok: true, text: 'Pengaturan konektor email MCP berhasil disimpan.' });
+      applyEmailSettings(data.settings);
+      setEmailMsg({ ok: true, text: 'Pengaturan konektor SMTP berhasil disimpan dan diaktifkan.' });
     } catch (err) {
       setEmailMsg({ ok: false, text: err.message });
     } finally {
       setEmailSaving(false);
+    }
+  };
+
+  const handleMcpEmailAction = async (action, extra = {}) => {
+    const isTest = action === 'test_mcp' || action === 'test_smtp';
+    if (isTest) setEmailTesting(true);
+    else setEmailSaving(true);
+    setEmailMsg(null);
+    try {
+      const res = await fetch('/api/settings', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, ...extra }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || 'Operasi konektor email gagal.');
+      }
+      if (data.settings) applyEmailSettings(data.settings);
+      setEmailMsg({ ok: true, text: data.message || 'Berhasil.' });
+    } catch (err) {
+      setEmailMsg({ ok: false, text: err.message });
+    } finally {
+      if (isTest) setEmailTesting(false);
+      else setEmailSaving(false);
     }
   };
 
@@ -387,82 +430,246 @@ export default function McpPluginModal({ onClose, currentSession }) {
         )}
 
         {activeTab === 'email' && (
-          <form onSubmit={handleSaveEmailConnector} style={{ fontSize: '0.875rem', lineHeight: 1.6, color: 'var(--text-main)' }}>
-            <p style={{ margin: '0 0 10px' }}>
-              <strong>Konektor Email Workspace:</strong> Simpan kredensial SMTP resmi agar AI Agent dan fitur outreach menggunakan pengirim Anda.
-            </p>
+          <div style={{ fontSize: '0.875rem', lineHeight: 1.55, color: 'var(--text-main)' }}>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '8px', marginBottom: '12px' }}>
+              {[
+                {
+                  id: 'gmail_mcp',
+                  title: '1. Konektor Cepat (Email)',
+                  badge: emailConn.mcpConnected ? 'Terhubung' : 'Praktis',
+                  badgeColor: emailConn.mcpConnected ? '#10b981' : 'var(--primary)',
+                  desc: 'Ketik alamat email Anda saja. Langsung terhubung tanpa App Password; balasan masuk ke email Anda.',
+                },
+                {
+                  id: 'smtp',
+                  title: '2. Server SMTP Mandiri',
+                  badge: !emailConn.mcpConnected && emailConn.passwordSet ? 'Aktif' : 'Manual',
+                  badgeColor: !emailConn.mcpConnected && emailConn.passwordSet ? '#10b981' : 'var(--text-muted)',
+                  desc: 'Pakai SMTP Host & App Password akun Anda sendiri agar header From asli memakai email Anda.',
+                },
+              ].map((opt) => {
+                const selected = emailConn.mode === opt.id;
+                return (
+                  <button
+                    key={opt.id}
+                    type="button"
+                    onClick={() => {
+                      setEmailConn((prev) => ({ ...prev, mode: opt.id }));
+                      setEmailMsg(null);
+                    }}
+                    style={{
+                      padding: '12px',
+                      borderRadius: '8px',
+                      border: selected ? '2px solid var(--primary)' : '1px solid var(--border-subtle)',
+                      background: selected ? 'rgba(37, 99, 235, 0.08)' : 'var(--bg-app)',
+                      color: 'var(--text-main)',
+                      textAlign: 'left',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      gap: '4px',
+                      minHeight: '44px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', width: '100%' }}>
+                      <span style={{ fontWeight: 700, fontSize: '0.84rem' }}>{opt.title}</span>
+                      <span style={{ fontSize: '0.7rem', fontWeight: 700, color: opt.badgeColor }}>{opt.badge}</span>
+                    </div>
+                    <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.4 }}>{opt.desc}</span>
+                  </button>
+                );
+              })}
+            </div>
+
             {emailMsg && (
-              <div role="status" style={{ background: emailMsg.ok ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)', border: `1px solid ${emailMsg.ok ? 'rgba(16, 185, 129, 0.35)' : 'rgba(239, 68, 68, 0.35)'}`, color: emailMsg.ok ? '#10b981' : '#ef4444', padding: '10px 12px', borderRadius: '8px', fontSize: '0.8125rem', marginBottom: '10px' }}>
+              <div role="status" style={{ background: emailMsg.ok ? 'rgba(16, 185, 129, 0.12)' : 'rgba(239, 68, 68, 0.12)', border: `1px solid ${emailMsg.ok ? 'rgba(16, 185, 129, 0.35)' : 'rgba(239, 68, 68, 0.35)'}`, color: emailMsg.ok ? '#10b981' : '#ef4444', padding: '10px 12px', borderRadius: '8px', fontSize: '0.8125rem', marginBottom: '12px' }}>
                 {emailMsg.text}
               </div>
             )}
-            <div style={{ background: 'var(--bg-app)', padding: '14px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
-              <div style={{ marginBottom: '10px' }}>
-                <label htmlFor="mcp-smtp-email" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, marginBottom: '4px' }}>Alamat Email Pengirim (SMTP User / From)</label>
-                <input
-                  id="mcp-smtp-email"
-                  type="email"
-                  className="text-input"
-                  placeholder="anda@perusahaan.com"
-                  value={emailConn.email_address}
-                  onChange={(e) => setEmailConn({ ...emailConn, email_address: e.target.value })}
-                  style={{ width: '100%', minHeight: '38px' }}
-                  required
-                />
-              </div>
-              <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
-                <div style={{ flex: '2 1 180px' }}>
-                  <label htmlFor="mcp-smtp-host" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, marginBottom: '4px' }}>SMTP Host</label>
-                  <input
-                    id="mcp-smtp-host"
-                    type="text"
-                    className="text-input"
-                    placeholder="smtp.gmail.com"
-                    value={emailConn.smtp_host}
-                    onChange={(e) => setEmailConn({ ...emailConn, smtp_host: e.target.value })}
-                    style={{ width: '100%', minHeight: '38px' }}
-                    required
-                  />
-                </div>
-                <div style={{ flex: '1 1 90px' }}>
-                  <label htmlFor="mcp-smtp-port" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, marginBottom: '4px' }}>Port</label>
-                  <input
-                    id="mcp-smtp-port"
-                    type="number"
-                    className="text-input"
-                    value={emailConn.smtp_port}
-                    onChange={(e) => setEmailConn({ ...emailConn, smtp_port: parseInt(e.target.value, 10) || 587 })}
-                    style={{ width: '100%', minHeight: '38px' }}
-                    required
-                  />
-                </div>
-              </div>
-              <div style={{ marginBottom: '12px' }}>
-                <label htmlFor="mcp-smtp-pass" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, marginBottom: '4px' }}>
-                  App Password {emailConn.passwordSet && <span style={{ color: '#10b981', fontWeight: 500 }}>(Sudah tersimpan &bull; kosongkan jika tidak diubah)</span>}
-                </label>
-                <input
-                  id="mcp-smtp-pass"
-                  type="password"
-                  className="text-input"
-                  placeholder={emailConn.passwordSet ? 'Kosongkan untuk tetap pakai password lama' : 'Masukkan App Password'}
-                  value={emailConn.password}
-                  onChange={(e) => setEmailConn({ ...emailConn, password: e.target.value })}
-                  style={{ width: '100%', minHeight: '38px' }}
-                />
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-                <button
-                  type="submit"
-                  className="btn btn-primary btn-sm"
-                  disabled={emailSaving}
-                  style={{ minHeight: '38px' }}
+
+            {emailConn.mode === 'gmail_mcp' && (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
+                <form
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    handleMcpEmailAction('connect_mcp', { email: emailConn.mcpEmail });
+                  }}
+                  style={{ background: 'var(--bg-app)', padding: '14px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}
                 >
-                  {emailSaving ? 'Menyimpan...' : 'Simpan Konektor'}
-                </button>
+                  {emailConn.mcpConnected && (
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap', paddingBottom: '10px', marginBottom: '10px', borderBottom: '1px solid var(--border-subtle)' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px', minWidth: 0 }}>
+                        <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: '#10b981', flexShrink: 0 }} />
+                        <span style={{ fontSize: '0.82rem', fontWeight: 600, wordBreak: 'break-all' }}>
+                          Terhubung: {emailConn.mcpAccount}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        className="btn btn-secondary btn-sm"
+                        disabled={emailSaving}
+                        onClick={() => handleMcpEmailAction('disconnect_mcp')}
+                        style={{ minHeight: '36px', color: '#ef4444' }}
+                      >
+                        Putus Koneksi
+                      </button>
+                    </div>
+                  )}
+
+                  <label htmlFor="mcp-quick-email" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, marginBottom: '4px' }}>
+                    Alamat Email Anda (Identitas Pengirim &amp; Balasan / Reply-To)
+                  </label>
+                  <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                    <input
+                      id="mcp-quick-email"
+                      type="email"
+                      className="text-input"
+                      placeholder="mis. wahyudiz6172@gmail.com"
+                      value={emailConn.mcpEmail}
+                      onChange={(e) => setEmailConn({ ...emailConn, mcpEmail: e.target.value })}
+                      style={{ flex: '1 1 240px', minHeight: '38px' }}
+                      required
+                    />
+                    <button
+                      type="submit"
+                      className="btn btn-primary btn-sm"
+                      disabled={emailSaving || !emailConn.mcpEmail.trim()}
+                      style={{ minHeight: '38px' }}
+                    >
+                      {emailSaving ? 'Menghubungkan...' : (emailConn.mcpConnected ? 'Perbarui Email' : 'Hubungkan Email')}
+                    </button>
+                  </div>
+                  <p style={{ margin: '8px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                    Email dikirim via relay Prospekta dengan tampilan nama &amp; header <strong>Reply-To</strong> memakai <strong>{emailConn.mcpEmail.trim() || 'email Anda'}</strong>, sehingga balasan penerima masuk ke inbox tersebut.
+                  </p>
+                </form>
+
+                {emailConn.mcpConnected && (
+                  <form
+                    onSubmit={(e) => {
+                      e.preventDefault();
+                      handleMcpEmailAction('test_mcp', { target_email: emailConn.testTo });
+                    }}
+                    style={{ background: 'var(--bg-app)', padding: '14px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}
+                  >
+                    <label htmlFor="mcp-quick-test-to" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, marginBottom: '4px' }}>
+                      Uji Kirim Email ke Penerima Tujuan (To)
+                    </label>
+                    <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
+                      <input
+                        id="mcp-quick-test-to"
+                        type="email"
+                        className="text-input"
+                        placeholder="mis. wahyudi.maxy.academy@gmail.com"
+                        value={emailConn.testTo}
+                        onChange={(e) => setEmailConn({ ...emailConn, testTo: e.target.value })}
+                        style={{ flex: '1 1 240px', minHeight: '38px' }}
+                        required
+                      />
+                      <button
+                        type="submit"
+                        className="btn btn-secondary btn-sm"
+                        disabled={emailTesting || !emailConn.testTo.trim()}
+                        style={{ minHeight: '38px' }}
+                      >
+                        {emailTesting ? 'Mengirim...' : 'Kirim Email Uji Coba'}
+                      </button>
+                    </div>
+                    <p style={{ margin: '8px 0 0', fontSize: '0.75rem', color: 'var(--text-muted)', wordBreak: 'break-all' }}>
+                      Pengirim / Reply-To: <strong>{emailConn.mcpAccount}</strong> &rarr; Penerima: <strong>{emailConn.testTo.trim() || 'isi email penerima'}</strong>
+                    </p>
+                  </form>
+                )}
               </div>
-            </div>
-          </form>
+            )}
+
+            {emailConn.mode === 'smtp' && (
+              <form onSubmit={handleSaveEmailConnector} style={{ background: 'var(--bg-app)', padding: '14px', borderRadius: '8px', border: '1px solid var(--border-subtle)' }}>
+                <div style={{ marginBottom: '10px' }}>
+                  <label htmlFor="mcp-smtp-email" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, marginBottom: '4px' }}>Alamat Email Pengirim (SMTP User / From)</label>
+                  <input
+                    id="mcp-smtp-email"
+                    type="email"
+                    className="text-input"
+                    placeholder="anda@perusahaan.com atau anda@gmail.com"
+                    value={emailConn.email_address}
+                    onChange={(e) => setEmailConn({ ...emailConn, email_address: e.target.value })}
+                    style={{ width: '100%', minHeight: '38px' }}
+                    required
+                  />
+                </div>
+                <div style={{ display: 'flex', gap: '8px', marginBottom: '10px', flexWrap: 'wrap' }}>
+                  <div style={{ flex: '2 1 180px' }}>
+                    <label htmlFor="mcp-smtp-host" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, marginBottom: '4px' }}>SMTP Host</label>
+                    <input
+                      id="mcp-smtp-host"
+                      type="text"
+                      className="text-input"
+                      placeholder="smtp.gmail.com"
+                      value={emailConn.smtp_host}
+                      onChange={(e) => setEmailConn({ ...emailConn, smtp_host: e.target.value })}
+                      style={{ width: '100%', minHeight: '38px' }}
+                      required
+                    />
+                  </div>
+                  <div style={{ flex: '1 1 90px' }}>
+                    <label htmlFor="mcp-smtp-port" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, marginBottom: '4px' }}>Port</label>
+                    <input
+                      id="mcp-smtp-port"
+                      type="number"
+                      className="text-input"
+                      value={emailConn.smtp_port}
+                      onChange={(e) => setEmailConn({ ...emailConn, smtp_port: parseInt(e.target.value, 10) || 587 })}
+                      style={{ width: '100%', minHeight: '38px' }}
+                      required
+                    />
+                  </div>
+                </div>
+                <div style={{ marginBottom: '12px' }}>
+                  <label htmlFor="mcp-smtp-pass" style={{ display: 'block', fontSize: '0.75rem', fontWeight: 600, marginBottom: '4px' }}>
+                    App Password {emailConn.passwordSet && <span style={{ color: '#10b981', fontWeight: 500 }}>(Sudah tersimpan &bull; kosongkan jika tidak diubah)</span>}
+                  </label>
+                  <input
+                    id="mcp-smtp-pass"
+                    type="password"
+                    className="text-input"
+                    placeholder={emailConn.passwordSet ? 'Kosongkan untuk tetap pakai password lama' : 'Masukkan App Password'}
+                    value={emailConn.password}
+                    onChange={(e) => setEmailConn({ ...emailConn, password: e.target.value })}
+                    style={{ width: '100%', minHeight: '38px' }}
+                  />
+                  <span style={{ display: 'block', fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '4px' }}>
+                    Untuk Gmail gunakan Sandi Aplikasi 16 karakter (port 587 TLS atau 465 SSL).
+                  </span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'flex-end', gap: '8px', flexWrap: 'wrap' }}>
+                  <button
+                    type="button"
+                    className="btn btn-secondary btn-sm"
+                    disabled={emailTesting || !emailConn.smtp_host.trim() || !emailConn.email_address.trim()}
+                    onClick={() => handleMcpEmailAction('test_smtp', {
+                      smtp_host: emailConn.smtp_host.trim(),
+                      smtp_port: Number(emailConn.smtp_port) || 587,
+                      smtp_user: emailConn.email_address.trim(),
+                      smtp_from: emailConn.email_address.trim(),
+                      ...(emailConn.password.trim() ? { smtp_pass: emailConn.password.trim() } : {}),
+                    })}
+                    style={{ minHeight: '38px' }}
+                  >
+                    {emailTesting ? 'Menguji...' : 'Tes Koneksi SMTP'}
+                  </button>
+                  <button
+                    type="submit"
+                    className="btn btn-primary btn-sm"
+                    disabled={emailSaving}
+                    style={{ minHeight: '38px' }}
+                  >
+                    {emailSaving ? 'Menyimpan...' : 'Simpan Konektor SMTP'}
+                  </button>
+                </div>
+              </form>
+            )}
+          </div>
         )}
       </div>
     </div>
