@@ -12,7 +12,7 @@ import {
 
 export const dynamic = 'force-dynamic';
 
-function buildSettingsPayload(keys) {
+function buildSettingsPayload(keys, resolvedLatestModel = null) {
   const active = keys.find((k) => k.is_active) || null;
   const activeMeta = active ? AI_PROVIDERS[active.provider] : null;
   return {
@@ -20,7 +20,7 @@ function buildSettingsPayload(keys) {
     keys,
     activeProvider: active?.provider || null,
     activeProviderName: activeMeta?.name || null,
-    activeModel: activeMeta?.defaultModel || null,
+    activeModel: resolvedLatestModel || activeMeta?.modelLabel || null,
     maskedKey: active?.masked_key || null,
   };
 }
@@ -75,8 +75,8 @@ export async function POST(request) {
 
     return NextResponse.json({
       success: true,
-      message: `API Key ${AI_PROVIDERS[provider].name} tervalidasi, terenkripsi AES-256-GCM, dan diaktifkan.`,
-      ...buildSettingsPayload(keys),
+      message: `API Key ${AI_PROVIDERS[provider].name} tervalidasi (model terbaru: ${testRes.model}), terenkripsi AES-256-GCM, dan diaktifkan.`,
+      ...buildSettingsPayload(keys, testRes.model),
     });
   } catch (err) {
     return NextResponse.json(

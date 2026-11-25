@@ -143,6 +143,7 @@ export async function POST(request) {
   if (body.action === 'disconnect_mcp') {
     await saveSettings(tid, {
       email_provider_mode: 'smtp',
+      gmail_mcp_account: '',
       gmail_mcp_connected: 0,
     });
     return NextResponse.json({

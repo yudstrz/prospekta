@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { sessionFromRequest } from '@/lib/auth';
-import { AI_PROVIDERS, getDecryptedActiveKey, listUserAiKeys, resolveModelForProvider } from '@/lib/ai-keys';
+import { AI_PROVIDERS, getDecryptedActiveKey, listUserAiKeys, resolveLatestModel, resolveModelForProvider } from '@/lib/ai-keys';
 import { runAiChatLoop } from '@/lib/ai-providers';
 import { sanitizeAiErrorMessage } from '@/lib/ai-crypto';
 
@@ -16,18 +16,25 @@ export async function GET(request) {
     const keys = await listUserAiKeys(session.uid);
     const active = keys.find((k) => k.is_active) || keys[0] || null;
     const providerMeta = active ? AI_PROVIDERS[active.provider] : null;
+    let resolvedModel = null;
+    if (active) {
+      const dec = await getDecryptedActiveKey(session.uid, active.provider).catch(() => null);
+      if (dec?.apiKey) {
+        resolvedModel = await resolveLatestModel(active.provider, dec.apiKey).catch(() => providerMeta?.fallbackModel || null);
+      }
+    }
     return NextResponse.json({
       success: true,
       configured: Boolean(active),
       provider: active?.provider || null,
       providerName: providerMeta?.name || null,
-      model: providerMeta?.defaultModel || null,
-      availableModels: providerMeta?.models || [],
+      model: resolvedModel,
+      modelLabel: providerMeta?.modelLabel || 'Otomatis Model Terbaru',
       maskedKey: active?.masked_key || null,
       savedProviders: keys.map((k) => ({
         provider: k.provider,
         name: AI_PROVIDERS[k.provider]?.name || k.provider,
-        models: AI_PROVIDERS[k.provider]?.models || [],
+        modelLabel: AI_PROVIDERS[k.provider]?.modelLabel || 'Otomatis Terbaru',
         maskedKey: k.masked_key,
         isActive: k.is_active,
       })),
@@ -64,7 +71,7 @@ export async function POST(request) {
       ? body.messages
       : (body.message ? [{ role: 'user', content: String(body.message) }] : []);
     const uiContext = body.context || {};
-    const requestedModel = resolveModelForProvider(keyRecord.provider, body.model);
+    const requestedModel = await resolveModelForProvider(keyRecord.provider, body.model || 'auto', keyRecord.apiKey);
     const wantsStream = body.stream !== false && request.headers.get('accept')?.includes('application/x-ndjson');
 
     if (!wantsStream) {

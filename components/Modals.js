@@ -240,6 +240,9 @@ export function ScanModal({ anchors = [], activeAnchor, initialRadius = 2, onClo
             <ul style={{ marginTop: '0.375rem', paddingLeft: '1.25rem', color: 'var(--success-text)', fontSize: '0.8125rem' }}>
               <li>Total tempat ditemukan di partisi: {result.totalDiscovered}</li>
               <li>Tempat baru disimpan ke database: {result.totalSaved}</li>
+              {typeof result.totalInAnchor === 'number' && (
+                <li>Total data tersimpan di titik ini: {result.totalInAnchor.toLocaleString()}</li>
+              )}
               <li>Jumlah tile yang diproses: {result.tilesTotal}</li>
             </ul>
           </div>

@@ -8,8 +8,8 @@ const DEFAULT_PROVIDERS = [
   {
     id: 'gemini',
     name: 'Google Gemini',
-    defaultModel: 'gemini-2.5-flash',
-    models: ['gemini-2.5-flash'],
+    defaultModel: 'auto',
+    modelLabel: 'Otomatis Model Terbaru (Flash Latest)',
     placeholder: 'AIzaSy...',
     docsUrl: 'https://aistudio.google.com/apikey',
     guide: 'Buka Google AI Studio -> Create API Key -> pilih project Google Cloud -> salin API key berawalan AIza.',
@@ -17,8 +17,8 @@ const DEFAULT_PROVIDERS = [
   {
     id: 'openai',
     name: 'OpenAI ChatGPT',
-    defaultModel: 'gpt-4o-mini',
-    models: ['gpt-4o-mini', 'gpt-4o'],
+    defaultModel: 'auto',
+    modelLabel: 'Otomatis Model Terbaru (GPT Latest)',
     placeholder: 'sk-proj-...',
     docsUrl: 'https://platform.openai.com/api-keys',
     guide: 'Buka OpenAI Platform -> API Keys -> Create new secret key -> salin secret key berawalan sk-.',
@@ -26,8 +26,8 @@ const DEFAULT_PROVIDERS = [
   {
     id: 'claude',
     name: 'Anthropic Claude',
-    defaultModel: 'claude-3-5-sonnet-latest',
-    models: ['claude-3-5-sonnet-latest', 'claude-3-5-haiku-latest'],
+    defaultModel: 'auto',
+    modelLabel: 'Otomatis Model Terbaru (Claude Latest)',
     placeholder: 'sk-ant-...',
     docsUrl: 'https://console.anthropic.com/settings/keys',
     guide: 'Buka Anthropic Console -> Settings -> API Keys -> Create Key -> salin key berawalan sk-ant-.',
@@ -80,14 +80,15 @@ export default function McpPluginModal({ onClose, currentSession, onKeysChanged,
 
   const applyEmailSettings = (s) => {
     if (!s) return;
+    const isConnected = Boolean(s.gmail_mcp_connected && s.gmail_mcp_account);
     setEmailConn((prev) => ({
       ...prev,
       mode: s.email_provider_mode === 'gmail_mcp'
         ? 'gmail_mcp'
         : (s.email_provider_mode === 'smtp' ? 'smtp' : prev.mode),
-      mcpEmail: s.gmail_mcp_account || prev.mcpEmail || '',
-      mcpAccount: s.gmail_mcp_account || '',
-      mcpConnected: Boolean(s.gmail_mcp_connected && s.gmail_mcp_account),
+      mcpEmail: isConnected ? s.gmail_mcp_account : '',
+      mcpAccount: isConnected ? s.gmail_mcp_account : '',
+      mcpConnected: isConnected,
       email_address: s.smtp_from || s.smtp_user || '',
       smtp_host: s.smtp_host || 'smtp.gmail.com',
       smtp_port: Number(s.smtp_port) || 587,
@@ -345,7 +346,7 @@ export default function McpPluginModal({ onClose, currentSession, onKeysChanged,
                 >
                   {providers.map((p) => (
                     <option key={p.id} value={p.id}>
-                      {p.name} ({p.defaultModel})
+                      {p.name} — {p.modelLabel || 'Otomatis Model Terbaru'}
                     </option>
                   ))}
                 </select>
@@ -386,12 +387,38 @@ export default function McpPluginModal({ onClose, currentSession, onKeysChanged,
                 </div>
               </div>
 
-              <div style={{ background: 'var(--bg-card)', padding: '10px 12px', borderRadius: '8px', border: '1px solid var(--border-subtle)', fontSize: '0.78rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
-                <strong style={{ color: 'var(--text-main)' }}>Cara mendapatkan key {providerMeta.name}:</strong>{' '}
-                {providerMeta.guide}{' '}
-                <a href={providerMeta.docsUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', fontWeight: 600 }}>
-                  Buka Konsol Key &rarr;
-                </a>
+              <div style={{ background: 'var(--bg-card)', padding: '12px', borderRadius: '8px', border: '1px solid var(--border-subtle)', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                  Panduan Mendapatkan API Key (Semua Penyedia AI):
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(195px, 1fr))', gap: '8px' }}>
+                  {providers.map((p) => {
+                    const isCurrent = p.id === selectedProvider;
+                    return (
+                      <div
+                        key={p.id}
+                        style={{
+                          padding: '9px 10px',
+                          borderRadius: '8px',
+                          border: isCurrent ? '1px solid var(--primary)' : '1px solid var(--border-subtle)',
+                          background: isCurrent ? 'rgba(37, 99, 235, 0.06)' : 'var(--bg-app)',
+                          fontSize: '0.74rem',
+                          lineHeight: 1.45,
+                          color: 'var(--text-muted)',
+                        }}
+                      >
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: '6px', marginBottom: '4px' }}>
+                          <strong style={{ color: 'var(--text-main)', fontSize: '0.78rem' }}>{p.name}</strong>
+                          <code style={{ fontSize: '0.68rem', color: 'var(--text-muted)' }}>{p.placeholder}</code>
+                        </div>
+                        <p style={{ margin: '0 0 6px' }}>{p.guide}</p>
+                        <a href={p.docsUrl} target="_blank" rel="noopener noreferrer" style={{ color: 'var(--primary)', fontWeight: 600 }}>
+                          Buka Konsol Key &rarr;
+                        </a>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
             </form>
 
@@ -445,7 +472,7 @@ export default function McpPluginModal({ onClose, currentSession, onKeysChanged,
                             )}
                           </div>
                           <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                            Model: {(meta?.models || []).join(' / ')}
+                            Mode: {meta?.modelLabel || 'Otomatis Model Terbaru'}
                           </div>
                         </div>
 
@@ -575,7 +602,7 @@ export default function McpPluginModal({ onClose, currentSession, onKeysChanged,
                       id="mcp-quick-email"
                       type="email"
                       className="text-input"
-                      placeholder="mis. wahyudiz6172@gmail.com"
+                      placeholder="mis. yourname@gmail.com"
                       value={emailConn.mcpEmail}
                       onChange={(e) => setEmailConn({ ...emailConn, mcpEmail: e.target.value })}
                       style={{ flex: '1 1 240px', minHeight: '38px' }}
@@ -611,7 +638,7 @@ export default function McpPluginModal({ onClose, currentSession, onKeysChanged,
                         id="mcp-quick-test-to"
                         type="email"
                         className="text-input"
-                        placeholder="mis. wahyudi.maxy.academy@gmail.com"
+                        placeholder="mis. penerima@perusahaan.com"
                         value={emailConn.testTo}
                         onChange={(e) => setEmailConn({ ...emailConn, testTo: e.target.value })}
                         style={{ flex: '1 1 240px', minHeight: '38px' }}

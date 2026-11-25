@@ -3305,10 +3305,15 @@ export default function DashboardPage() {
           initialRadius={radiusKm}
           onClose={() => setActiveModal(null)}
           onScanComplete={(scanData) => {
+            if (scanData?.anchor) {
+              const matched = anchors.find((a) => a.name === scanData.anchor);
+              if (matched) setActiveAnchorId(matched.id);
+            }
             if (scanData?.radiusKm) {
               hasInitRadiusRef.current = true;
               setRadiusKm(Number(scanData.radiusKm));
             }
+            setPage(1);
             handleRefresh();
           }}
         />

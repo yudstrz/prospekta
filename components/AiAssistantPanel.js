@@ -31,8 +31,7 @@ export default function AiAssistantPanel({
   isOpen = false,
   onToggleOpen,
 }) {
-  const [status, setStatus] = useState({ loading: true, configured: false, provider: null, providerName: null, model: null, availableModels: [], savedProviders: [] });
-  const [selectedModel, setSelectedModel] = useState('');
+  const [status, setStatus] = useState({ loading: true, configured: false, provider: null, providerName: null, model: null, modelLabel: '', savedProviders: [] });
   const [selectedProvider, setSelectedProvider] = useState('');
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState('');
@@ -49,7 +48,6 @@ export default function AiAssistantPanel({
       if (res.ok && data.success) {
         setStatus({ loading: false, ...data });
         setSelectedProvider(data.provider || '');
-        setSelectedModel(data.model || '');
       } else {
         setStatus((prev) => ({ ...prev, loading: false }));
       }
@@ -68,12 +66,9 @@ export default function AiAssistantPanel({
 
   const handleProviderSwitch = (nextProvider) => {
     setSelectedProvider(nextProvider);
-    const meta = (status.savedProviders || []).find((p) => p.provider === nextProvider);
-    setSelectedModel(meta?.models?.[0] || '');
   };
 
   const currentProviderObj = (status.savedProviders || []).find((p) => p.provider === selectedProvider) || null;
-  const availableModels = currentProviderObj?.models || status.availableModels || [];
 
   const sendPrompt = async (promptText) => {
     const clean = String(promptText || '').trim();
@@ -97,7 +92,7 @@ export default function AiAssistantPanel({
         },
         body: JSON.stringify({
           provider: selectedProvider || undefined,
-          model: selectedModel || undefined,
+          model: 'auto',
           messages: nextHistory.map((m) => ({ role: m.role, content: m.content })),
           context: {
             activeAnchor: activeAnchor ? { id: activeAnchor.id, name: activeAnchor.name, city: activeAnchor.city } : null,
@@ -258,7 +253,7 @@ export default function AiAssistantPanel({
               <span style={{ width: '6px', height: '6px', borderRadius: '50%', background: 'currentColor' }} />
               {status.configured ? (
                 <span>
-                  {currentProviderObj?.name || status.providerName} &bull; {selectedModel || status.model}
+                  {currentProviderObj?.name || status.providerName} &bull; {status.model ? `${status.model} (Otomatis)` : (currentProviderObj?.modelLabel || 'Model Terbaru')}
                 </span>
               ) : (
                 <span>API Key belum terhubung</span>
@@ -313,19 +308,7 @@ export default function AiAssistantPanel({
                 style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-subtle)', borderRadius: '6px', padding: '3px 6px', fontSize: '0.72rem', minHeight: '28px' }}
               >
                 {status.savedProviders.map((sp) => (
-                  <option key={sp.provider} value={sp.provider}>{sp.name}</option>
-                ))}
-              </select>
-            )}
-            {availableModels.length > 1 && (
-              <select
-                aria-label="Pilih model AI"
-                value={selectedModel}
-                onChange={(e) => setSelectedModel(e.target.value)}
-                style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-subtle)', borderRadius: '6px', padding: '3px 6px', fontSize: '0.72rem', minHeight: '28px' }}
-              >
-                {availableModels.map((m) => (
-                  <option key={m} value={m}>{m}</option>
+                  <option key={sp.provider} value={sp.provider}>{sp.name} (Latest)</option>
                 ))}
               </select>
             )}

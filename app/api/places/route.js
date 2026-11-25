@@ -24,7 +24,8 @@ export async function GET(request) {
     const hasLinkedin = searchParams.get('has_linkedin');
     const maxDistance = searchParams.get('max_distance');
     const isMapMode = searchParams.get('map_points') === 'true';
-    const tid = (await sessionFromRequest(request))?.tid || null;
+    const rawTid = (await sessionFromRequest(request))?.tid || null;
+    const tid = (rawTid && rawTid !== 'tnt_master') ? rawTid : null;
     const sortBy = searchParams.get('sort_by') || 'distance_m';
     const bypassCache = searchParams.get('fresh') === '1' || searchParams.has('_t');
     const cacheTtl = bypassCache ? 0 : 15000;
@@ -167,8 +168,8 @@ export async function GET(request) {
       conditions.push('anchor IN (SELECT name FROM anchors WHERE tenant_id = ?)');
       args.push(tid);
     } else {
-      // Admin Prospekta internal hanya melihat data wilayah Prospekta, bukan data tenant klien
-      conditions.push('(anchor IN (SELECT name FROM anchors WHERE tenant_id IS NULL) OR anchor NOT IN (SELECT name FROM anchors WHERE tenant_id IS NOT NULL))');
+      // Admin Prospekta internal melihat wilayah master (tenant_id NULL atau tnt_master), bukan tenant klien
+      conditions.push("(anchor IN (SELECT name FROM anchors WHERE tenant_id IS NULL OR tenant_id = 'tnt_master') OR anchor NOT IN (SELECT name FROM anchors WHERE tenant_id IS NOT NULL AND tenant_id != 'tnt_master'))");
     }
 
     const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
@@ -483,7 +484,7 @@ export async function GET(request) {
       offset,
       places: finalPlaces
     }, {
-      headers: { 'Cache-Control': 'public, s-maxage=20, stale-while-revalidate=60' }
+      headers: { 'Cache-Control': 'private, no-store, max-age=0' }
     });
   } catch (error) {
     console.error('Error fetching places:', error);
