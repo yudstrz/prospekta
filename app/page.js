@@ -233,7 +233,6 @@ export default function DashboardPage() {
 
   // Outreach KPI SOP State (25 email per hari)
   const [onlyPersonalLeads, setOnlyPersonalLeads] = useState(false);
-  const [sgDailyStats, setSgDailyStats] = useState(null);
   const [tsvCopied, setTsvCopied] = useState(false);
 
   // Copy current places table to TSV format for Google Sheets / Excel (Aligned with Step 5 SOP Tracker)
@@ -434,17 +433,6 @@ export default function DashboardPage() {
     }
   };
 
-  // Fetch Daily Outreach Quota Stats (25 email per hari)
-  const fetchSgStats = async () => {
-    try {
-      const res = await fetch(`/api/reach/sg/personal-leads?_t=${Date.now()}`, { cache: 'no-store' });
-      const data = await res.json();
-      if (data.success && data.quotaStats) {
-        setSgDailyStats(data.quotaStats);
-      }
-    } catch (_) {}
-  };
-
   // Google Sheet Master Sync State
   const [isSyncingSheet, setIsSyncingSheet] = useState(false);
   const [sheetSyncResult, setSheetSyncResult] = useState(null);
@@ -461,7 +449,6 @@ export default function DashboardPage() {
       setSheetSyncResult(`Berhasil memperbarui ${data.totalProcessed || data.updated} data prospek dari Google Sheet Master!`);
       setTimeout(() => setSheetSyncResult(null), 7000);
       handleRefresh();
-      fetchSgStats();
     } catch (err) {
       alert(`Sinkronisasi Google Sheet gagal: ${err.message}`);
     } finally {
@@ -543,7 +530,6 @@ export default function DashboardPage() {
     fetchAnchors();
     fetchCategoryOptions();
     fetchQuota();
-    fetchSgStats();
     fetchSettings();
   }, [fetchSettings]);
 
@@ -717,7 +703,6 @@ export default function DashboardPage() {
     fetchAnchors();
     fetchCategoryOptions();
     fetchQuota();
-    fetchSgStats();
     fetchSettings();
     setRefreshCounter((c) => c + 1);
   };
@@ -1067,7 +1052,7 @@ export default function DashboardPage() {
               aria-label="MCP Plugin"
               style={{ padding: '0.4rem', minHeight: '38px', minWidth: '38px' }}
             >
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
             </button>
 
             <button
@@ -1511,6 +1496,7 @@ export default function DashboardPage() {
           )
         }}
         onOpenPrebuiltSites={() => setActiveModal('prebuilt_sites')}
+        onOpenMcpModal={() => setActiveModal('mcp_plugin')}
         onFilterReplied={() => {
           setReachStatus((prev) => (prev === 'replied' ? 'all' : 'replied'));
           setPage(1);
@@ -3280,7 +3266,6 @@ export default function DashboardPage() {
           onClose={() => {
             setSelectedReachPlace(null);
             fetchQuota();
-            fetchSgStats();
             handleRefresh();
           }}
           onUpdatePlace={(updatedPlace) => {
@@ -3288,7 +3273,6 @@ export default function DashboardPage() {
               prev.map((p) => (p.overture_id === updatedPlace.overture_id ? updatedPlace : p))
             );
             fetchQuota();
-            fetchSgStats();
             handleRefresh();
           }}
         />
@@ -3352,7 +3336,6 @@ export default function DashboardPage() {
           onClose={() => setActiveModal(null)}
           onSyncSuccess={() => {
             handleRefresh();
-            fetchSgStats();
           }}
         />
       )}
@@ -3364,7 +3347,6 @@ export default function DashboardPage() {
           onClose={() => setActiveModal(null)}
           onSuccess={() => {
             handleRefresh();
-            fetchSgStats();
           }}
         />
       )}
