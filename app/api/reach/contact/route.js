@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { db } from '@/lib/db';
+import { db, dbWrite, invalidateCache } from '@/lib/db';
 import { lookupApolloPerson } from '@/lib/apollo';
 import { sessionFromRequest } from '@/lib/auth';
 
@@ -92,10 +92,63 @@ export async function POST(request) {
     }
 
     const body = await request.json().catch(() => ({}));
-    const { placeId, pic_name, pic_title, phone, phone_secondary, email, linkedin_url, pic_linkedin_url } = body;
+    const { action, placeId, pic_name, pic_title, phone, phone_secondary, email, linkedin_url, pic_linkedin_url } = body;
 
     if (!placeId) {
       return NextResponse.json({ success: false, error: 'Parameter placeId diperlukan.' }, { status: 400 });
+    }
+
+    if (action === 'verify_lead') {
+      const nowIso = new Date().toISOString();
+      const sPic = cleanStr(body.picName, 100);
+      const sDmName = cleanStr(body.dmName, 100);
+      const sDmTitle = cleanStr(body.dmTitle, 100);
+      const sEmail = cleanStr(body.verifiedEmail, 120);
+      const sPhone = cleanStr(body.phone, 40);
+      const sBudget = cleanStr(body.budgetCapacity, 40) || 'medium';
+      const sBudgetNotes = cleanStr(body.budgetNotes, 300);
+      const sWebCond = cleanStr(body.websiteCondition, 40) || 'none';
+      const sSocCond = cleanStr(body.socialCondition, 40) || 'inactive';
+      const sAngle = cleanStr(body.offerAngle, 60) || 'digital_structure';
+      const sNotes = cleanStr(body.notes, 1000);
+      const tid = session?.tid || 'tnt_master';
+
+      await dbWrite.batch([
+        {
+          sql: `UPDATE places SET
+                  is_personal_lead = 1,
+                  contact_verified = 1,
+                  assigned_pic = COALESCE(?, assigned_pic),
+                  pic_name = COALESCE(?, pic_name),
+                  pic_title = COALESCE(?, pic_title),
+                  email = COALESCE(?, email),
+                  phone = COALESCE(?, phone),
+                  budget_capacity = ?,
+                  budget_notes = ?,
+                  website_condition = ?,
+                  social_condition = ?,
+                  offer_angle = ?,
+                  notes = ?,
+                  sg_notes = ?,
+                  lead_verified_at = ?,
+                  reach_status = CASE WHEN COALESCE(reach_status, 'new') = 'new' THEN 'analyzed' ELSE reach_status END
+                WHERE overture_id = ?;`,
+          args: [sPic, sDmName, sDmTitle, sEmail, sPhone, sBudget, sBudgetNotes, sWebCond, sSocCond, sAngle, sNotes, sNotes, nowIso, placeId],
+        },
+        {
+          sql: `INSERT INTO places_status_overlay (place_id, reach_status, assigned_pic, pic_name, pic_title, notes, updated_at, tenant_id)
+                VALUES (?, 'analyzed', ?, ?, ?, ?, ?, ?)
+                ON CONFLICT(place_id) DO UPDATE SET
+                  assigned_pic = COALESCE(excluded.assigned_pic, places_status_overlay.assigned_pic),
+                  pic_name = COALESCE(excluded.pic_name, places_status_overlay.pic_name),
+                  pic_title = COALESCE(excluded.pic_title, places_status_overlay.pic_title),
+                  notes = COALESCE(excluded.notes, places_status_overlay.notes),
+                  updated_at = excluded.updated_at;`,
+          args: [placeId, sPic, sDmName, sDmTitle, sNotes, nowIso, tid],
+        },
+      ], 'write');
+      invalidateCache();
+      return NextResponse.json({ success: true, message: 'Verifikasi lead dan audit 3 pilar berhasil disimpan.' });
     }
 
     const sName = cleanStr(pic_name, 100);

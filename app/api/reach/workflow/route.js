@@ -1,7 +1,34 @@
 import { NextResponse } from 'next/server';
-import { db, invalidateCache } from '@/lib/db';
+import { db, dbWrite, invalidateCache } from '@/lib/db';
+import { sessionFromRequest } from '@/lib/auth';
 import { generatePrebuiltSiteConfig } from '@/lib/llm';
 import { crawlCompanyWebsite } from '@/lib/crawler';
+
+export async function GET(request) {
+  try {
+    const session = await sessionFromRequest(request);
+    if (!session) {
+      return NextResponse.json({ success: false, error: 'Unauthorized' }, { status: 401 });
+    }
+    const { searchParams } = new URL(request.url);
+    const placeId = (searchParams.get('placeId') || '').trim();
+    if (!placeId) {
+      return NextResponse.json({ success: false, error: 'Parameter placeId diperlukan.' }, { status: 400 });
+    }
+    const tid = session.tid || null;
+    const isClient = Boolean(tid && tid !== 'tnt_master');
+    const logsRes = await dbWrite.execute({
+      sql: isClient
+        ? `SELECT id, pic_name, sender_email, recipient_email, sent_date, subject, status, created_at FROM sg_outreach_logs WHERE place_id = ? AND tenant_id = ? ORDER BY created_at DESC;`
+        : `SELECT id, pic_name, sender_email, recipient_email, sent_date, subject, status, created_at FROM sg_outreach_logs WHERE place_id = ? AND (tenant_id IS NULL OR tenant_id = 'tnt_master' OR tenant_id = '') ORDER BY created_at DESC;`,
+      args: isClient ? [placeId, tid] : [placeId],
+    }).catch(() => ({ rows: [] }));
+
+    return NextResponse.json({ success: true, logs: logsRes.rows || [] });
+  } catch (err) {
+    return NextResponse.json({ success: false, error: err.message }, { status: 500 });
+  }
+}
 
 function resolveOutreachStrategy(place) {
   return { segment: 'general', angle: place?.offer_angle || 'digital_structure' };
@@ -25,6 +52,8 @@ function buildSgExecutiveEmail({ companyName, offerAngle }) {
  */
 export async function POST(request) {
   try {
+    const session = await sessionFromRequest(request);
+    const tid = session?.tid || 'tnt_master';
     const body = await request.json().catch(() => ({}));
     const {
       placeId,
@@ -32,15 +61,79 @@ export async function POST(request) {
       dmName,
       dmTitle,
       verifiedEmail,
+      recipientEmail,
+      recipientName,
       offerAngle,
+      subject,
+      bodyText,
+      allowFollowup,
       websiteCondition,
       observedBottleneck,
       lang = 'en',
-      action = 'draft_and_check' // 'draft_and_check' | 'generate_and_log'
+      action = 'draft_and_check' // 'draft_and_check' | 'generate_and_log' | 'log_outreach'
     } = body;
 
     if (!placeId) {
       return NextResponse.json({ success: false, error: 'Parameter placeId diperlukan.' }, { status: 400 });
+    }
+
+    if (action === 'log_outreach') {
+      const target = String(recipientEmail || verifiedEmail || '').trim().toLowerCase();
+      const today = new Date().toISOString().slice(0, 10);
+      const nowIso = new Date().toISOString();
+      const dupCheck = await dbWrite.execute({
+        sql: `SELECT id FROM sg_outreach_logs WHERE place_id = ? LIMIT 1;`,
+        args: [placeId],
+      }).catch(() => ({ rows: [] }));
+      if ((dupCheck.rows?.length || 0) > 0 && !allowFollowup) {
+        return NextResponse.json({
+          success: false,
+          error: 'Outreach sudah pernah tercatat untuk prospek ini. Centang izinkan follow-up jika ingin mencatat ulang.',
+        }, { status: 409 });
+      }
+      const logId = `log_${Date.now()}_${Math.random().toString(36).substring(2, 6)}`;
+      await dbWrite.batch([
+        {
+          sql: `INSERT INTO sg_outreach_logs (
+                  id, place_id, pic_name, sender_email, recipient_email, recipient_name,
+                  offer_angle, subject, body_text, status, sent_date, created_at, tenant_id
+                ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, 'sent', ?, ?, ?);`,
+          args: [
+            logId,
+            placeId,
+            picName || 'Tim Outreach',
+            session?.email || 'admin@prospekta.id',
+            target,
+            recipientName || dmName || 'Management',
+            offerAngle || 'digital_structure',
+            subject || '',
+            bodyText || '',
+            today,
+            nowIso,
+            tid,
+          ],
+        },
+        {
+          sql: `UPDATE places SET reach_status = 'sent', last_outreach_at = ?, outreach_count = COALESCE(outreach_count, 0) + 1 WHERE overture_id = ?;`,
+          args: [today, placeId],
+        },
+        {
+          sql: `INSERT INTO places_status_overlay (place_id, reach_status, last_outreach_at, updated_at, tenant_id)
+                VALUES (?, 'sent', ?, ?, ?)
+                ON CONFLICT(place_id) DO UPDATE SET
+                  reach_status = 'sent',
+                  last_outreach_at = excluded.last_outreach_at,
+                  updated_at = excluded.updated_at,
+                  tenant_id = excluded.tenant_id;`,
+          args: [placeId, today, nowIso, tid],
+        },
+      ], 'write');
+      invalidateCache();
+      return NextResponse.json({
+        success: true,
+        logId,
+        message: 'Log outreach berhasil dicatat dan status prospek diperbarui ke Terkirim.',
+      });
     }
 
     // 1. Ambil data tempat usaha terkini

@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { db } from '@/lib/db';
-import { generateProposalDraft } from '@/lib/llm';
+import { generateProposalDraft, generateAiColdEmail } from '@/lib/llm';
 import { sessionFromRequest } from '@/lib/auth';
 import { getSettings, consumeTenantQuota } from '@/lib/tenant';
 
@@ -82,7 +82,31 @@ export async function POST(request) {
       });
     }
 
-    const rawAnalysis = analysisRes.rows?.[0];
+    const rawAnalysis = analysisRes.rows?.[0] || null;
+
+    if (body.action === 'ai_email') {
+      const tSettings = tid ? await getSettings(tid).catch(() => null) : null;
+      const email = await generateAiColdEmail({
+        companyName: place.name,
+        category: place.bidang_usaha || place.category_raw || 'Umum',
+        dmName: body.dmName || place.pic_name || '',
+        dmTitle: body.dmTitle || place.pic_title || '',
+        analysis: rawAnalysis || {},
+        place,
+        lang: lang === 'id' ? 'id' : 'en',
+        websiteCondition: body.websiteCondition || place.website_condition || null,
+        offerAngle: body.offerAngle || place.offer_angle || null,
+        location: body.location || place.city || '',
+        tenantCompany: tSettings?.company_name || session?.company_name || '',
+        tenantSenderName: tSettings?.smtp_from || session?.displayName || session?.email || '',
+        tenantSenderEmail: tSettings?.gmail_mcp_account || tSettings?.smtp_user || session?.email || '',
+        isClient: Boolean(tid && tid !== 'tnt_master'),
+        tenantId: tid,
+        userId: session?.uid || null,
+      });
+      return NextResponse.json({ success: true, email });
+    }
+
     if (!rawAnalysis) {
       return NextResponse.json({
         success: false,
@@ -106,7 +130,8 @@ export async function POST(request) {
       analysis: parsedAnalysis,
       place,
       lang,
-      tenantId: tid
+      tenantId: tid,
+      userId: session?.uid || null,
     });
 
     const proposalId = `prop_${Date.now()}_${Math.random().toString(36).substring(2, 7)}`;

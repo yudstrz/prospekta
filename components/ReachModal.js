@@ -374,7 +374,7 @@ export default function ReachModal({ place: initialPlace, onClose, onUpdatePlace
     // Ambil riwayat log pengiriman outreach (cek deduplikasi)
     setExistingLogs([]);
     setAllowFollowup(false);
-    fetch(`/api/reach/sg/log-outreach?placeId=${place.overture_id}`)
+    fetch(`/api/reach/workflow?placeId=${place.overture_id}`)
       .then((res) => res.json())
       .then((data) => {
         if (data.success && data.logs) {
@@ -654,10 +654,11 @@ export default function ReachModal({ place: initialPlace, onClose, onUpdatePlace
     );
 
     try {
-      const res = await fetch('/api/reach/ai-email', {
+      const res = await fetch('/api/reach/proposal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          action: 'ai_email',
           placeId: place.overture_id,
           analysisId: analysis?.id,
           lang: langToUse,
@@ -750,10 +751,11 @@ export default function ReachModal({ place: initialPlace, onClose, onUpdatePlace
     setSgSaving(true);
     setSgStatusMsg(null);
     try {
-      const res = await fetch('/api/reach/sg/verify-lead', {
+      const res = await fetch('/api/reach/contact', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          action: 'verify_lead',
           placeId: place.overture_id,
           picName: sgForm.picName,
           dmName: sgForm.dmName,
@@ -806,10 +808,11 @@ export default function ReachModal({ place: initialPlace, onClose, onUpdatePlace
     setSgOutreachLogging(true);
     setSgOutreachMsg(null);
     try {
-      const res = await fetch('/api/reach/sg/log-outreach', {
+      const res = await fetch('/api/reach/workflow', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          action: 'log_outreach',
           placeId: place.overture_id,
           picName: sgForm.picName || place.assigned_pic || '',
           recipientEmail: sgForm.verifiedEmail || place.email || '',

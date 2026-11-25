@@ -25,7 +25,6 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
   const [statusMsg, setStatusMsg] = useState(null);
   const [showAdvancedTg, setShowAdvancedTg] = useState(false);
   const [showByok, setShowByok] = useState(false);
-  const [linkingTg, setLinkingTg] = useState(false);
   const [isCrawlerOpen, setIsCrawlerOpen] = useState(false);
 
   // Team state
@@ -234,28 +233,6 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
       setStatusMsg({ type: 'error', text: err.message });
     } finally {
       setSaving(false);
-    }
-  };
-
-  const handleLinkTelegram = async () => {
-    setLinkingTg(true);
-    setStatusMsg(null);
-    try {
-      const url = tenantId ? `/api/telegram/link?tenant_id=${encodeURIComponent(tenantId)}` : '/api/telegram/link';
-      const res = await fetch(url, { method: 'POST' });
-      const data = await res.json();
-      if (!res.ok || !data.success || !data.deepLink) {
-        throw new Error(data.error || 'Gagal membuat tautan Telegram.');
-      }
-      window.open(data.deepLink, '_blank', 'noopener,noreferrer');
-      setStatusMsg({
-        type: 'success',
-        text: `Buka bot @${data.botUsername} di tab baru lalu tekan "Start" untuk menautkan workspace ini secara otomatis.`,
-      });
-    } catch (err) {
-      setStatusMsg({ type: 'error', text: err.message });
-    } finally {
-      setLinkingTg(false);
     }
   };
 
@@ -1217,38 +1194,27 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                       </div>
                     )}
 
-                    {/* Koneksi Telegram 1-Klik via Bot Resmi */}
+                    {/* Konfigurasi Notifikasi Telegram */}
                     <div
                       style={{
                         padding: '12px 14px',
                         borderRadius: '8px',
-                        border: `1px solid ${settings.telegram_chat_id ? 'rgba(16,185,129,0.4)' : 'var(--border-subtle)'}`,
-                        backgroundColor: settings.telegram_chat_id ? 'rgba(16,185,129,0.05)' : 'var(--bg-app)',
+                        border: `1px solid ${settings.telegram_chat_id ? 'var(--success-border)' : 'var(--border-subtle)'}`,
+                        backgroundColor: settings.telegram_chat_id ? 'var(--success-bg)' : 'var(--bg-app)',
                         display: 'flex',
                         flexDirection: 'column',
                         gap: '10px',
                       }}
                     >
-                      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '8px' }}>
-                        <div>
-                          <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>
-                            Notifikasi Bot Telegram Resmi
-                          </div>
-                          <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
-                            {settings.telegram_chat_id
-                              ? `Terhubung ke Chat ID: ${settings.telegram_chat_id}`
-                              : 'Hubungkan dalam 1 klik tanpa perlu membuat bot di @BotFather.'}
-                          </div>
+                      <div>
+                        <div style={{ fontSize: '0.85rem', fontWeight: 600, color: 'var(--text-main)' }}>
+                          Notifikasi Bot Telegram
                         </div>
-                        <button
-                          type="button"
-                          onClick={handleLinkTelegram}
-                          disabled={linkingTg}
-                          className="btn btn-primary"
-                          style={{ height: '36px', fontSize: '0.8rem', padding: '0 14px' }}
-                        >
-                          {linkingTg ? 'Menyiapkan tautan...' : settings.telegram_chat_id ? 'Hubungkan Ulang' : 'Hubungkan Telegram (1 Klik)'}
-                        </button>
+                        <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
+                          {settings.telegram_chat_id
+                            ? `Terhubung ke Chat ID: ${settings.telegram_chat_id}`
+                            : 'Masukkan Chat ID tujuan dan opsional Bot Token pribadi lalu klik Simpan Perubahan.'}
+                        </div>
                       </div>
 
                       <button
@@ -1256,7 +1222,7 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                         onClick={() => setShowAdvancedTg(!showAdvancedTg)}
                         style={{ alignSelf: 'flex-start', background: 'none', border: 'none', color: 'var(--accent-text)', fontSize: '0.75rem', fontWeight: 600, cursor: 'pointer', minHeight: '36px', padding: 0 }}
                       >
-                        {showAdvancedTg ? '▾ Sembunyikan pengaturan bot manual' : '▸ Atur Chat ID / Bot Kustom manual (opsional)'}
+                        {showAdvancedTg ? '▾ Sembunyikan pengaturan Chat ID & Bot' : '▸ Atur Chat ID / Bot Telegram'}
                       </button>
 
                       {showAdvancedTg && (

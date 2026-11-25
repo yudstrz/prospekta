@@ -20,7 +20,6 @@ const CLIENT_ROUTES = [
   '/api/settings',
   '/api/categories',
   '/api/tenant/',
-  '/api/telegram/link',
   '/api/reach/',
   '/api/places',
   '/api/scan',
