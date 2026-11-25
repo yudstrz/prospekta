@@ -5,13 +5,17 @@ import { copyToClipboard } from '@/lib/clipboard';
 import { ProspektaMark } from './ProspektaLogo';
 
 const QUICK_PROMPTS = [
-  'Cari prospek bisnis di area terpilih',
-  'Buat proposal PDF untuk prospek teratas',
+  'Scan bisnis baru di radius area aktif',
+  'Filter ke tabel prospek yang belum punya website',
+  'Analisis mendalam & buat proposal untuk prospek teratas',
   'Buat website preview untuk prospek tanpa website',
-  'Tampilkan arsip proposal & website saya',
 ];
 
 const MUTATING_TOOLS = new Set([
+  'scan_area_prospects',
+  'analyze_prospect',
+  'update_prospect_status',
+  'update_prospect_contact',
   'generate_proposal_pdf',
   'generate_website_preview',
   'send_email_outreach',
@@ -22,6 +26,7 @@ export default function AiAssistantPanel({
   radiusKm,
   onOpenAiSettings,
   onDataChanged,
+  onUiAction,
   refreshKey = 0,
   isOpen = false,
   onToggleOpen,
@@ -138,6 +143,9 @@ export default function AiAssistantPanel({
             setLiveStatus(evt.text || '');
           } else if (evt.type === 'tool') {
             streamedTools.push({ name: evt.tool, summary: evt.summary, output: evt.output });
+            if (evt.output?.uiAction) {
+              onUiAction?.(evt.output.uiAction);
+            }
             if (MUTATING_TOOLS.has(evt.tool) && !refreshed) {
               refreshed = true;
               onDataChanged?.();
@@ -390,6 +398,9 @@ export default function AiAssistantPanel({
             .map((t) => t.output?.previewUrl)
             .filter(Boolean);
           const proposalTool = (msg.toolCalls || []).find((t) => t.name === 'generate_proposal_pdf' && t.output?.contentMarkdown);
+          const topProspect = (msg.toolCalls || []).find((t) => t.output?.placeId || t.output?.overture_id);
+          const actionablePlaceId = topProspect?.output?.placeId || topProspect?.output?.overture_id || null;
+          const actionablePlaceName = topProspect?.output?.placeName || topProspect?.output?.name || topProspect?.output?.companyName || '';
 
           return (
             <div
@@ -442,8 +453,18 @@ export default function AiAssistantPanel({
                 </div>
               )}
 
-              {(previewUrls.length > 0 || proposalTool) && (
+              {(previewUrls.length > 0 || proposalTool || actionablePlaceId) && (
                 <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', marginTop: '10px', paddingTop: '8px', borderTop: '1px solid var(--border-subtle)' }}>
+                  {actionablePlaceId && (
+                    <button
+                      type="button"
+                      className="btn btn-secondary btn-sm"
+                      onClick={() => onUiAction?.({ type: 'open_place_by_id', placeId: actionablePlaceId, name: actionablePlaceName })}
+                      style={{ minHeight: '34px', fontSize: '0.74rem' }}
+                    >
+                      Buka Detail {actionablePlaceName || 'Prospek'}
+                    </button>
+                  )}
                   {previewUrls.map((url) => (
                     <a
                       key={url}

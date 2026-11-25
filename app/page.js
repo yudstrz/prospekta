@@ -3401,6 +3401,66 @@ export default function DashboardPage() {
         onToggleOpen={setIsAiPanelOpen}
         onOpenAiSettings={() => setActiveModal('mcp_plugin')}
         onDataChanged={handleRefresh}
+        onUiAction={async (action) => {
+          if (!action) return;
+          if (action.type === 'select_anchor') {
+            await fetchAnchors();
+            if (action.anchorId) setActiveAnchorId(action.anchorId);
+            if (action.radiusKm) {
+              hasInitRadiusRef.current = true;
+              setRadiusKm(Number(action.radiusKm));
+            }
+            setPage(1);
+            handleRefresh();
+          } else if (action.type === 'apply_filter') {
+            const f = action.filters || {};
+            if (f.resetFilters) {
+              setSearch('');
+              setBidangUsaha('all');
+              setReachStatus('all');
+              setNoWebsite(false);
+              setHasWebsite(false);
+              setHasPhone(false);
+              setHasEmail(false);
+            }
+            if (f.anchorName) {
+              const matched = anchors.find((a) => a.name.toLowerCase().includes(String(f.anchorName).toLowerCase()));
+              if (matched) setActiveAnchorId(matched.id);
+            }
+            if (f.radiusKm) {
+              hasInitRadiusRef.current = true;
+              setRadiusKm(Number(f.radiusKm));
+            }
+            if (f.searchQuery !== undefined) setSearch(String(f.searchQuery || ''));
+            if (f.reachStatus) setReachStatus(f.reachStatus);
+            if (typeof f.noWebsite === 'boolean') {
+              setNoWebsite(f.noWebsite);
+              if (f.noWebsite) setHasWebsite(false);
+            }
+            if (typeof f.hasWebsite === 'boolean') {
+              setHasWebsite(f.hasWebsite);
+              if (f.hasWebsite) setNoWebsite(false);
+            }
+            if (typeof f.hasPhone === 'boolean') setHasPhone(f.hasPhone);
+            if (typeof f.hasEmail === 'boolean') setHasEmail(f.hasEmail);
+            setPage(1);
+            const tableEl = document.getElementById('places-table-section');
+            if (tableEl) tableEl.scrollIntoView({ behavior: 'smooth' });
+          } else if (action.type === 'open_place' && action.place) {
+            handleOpenReach(action.place);
+          } else if (action.type === 'open_place_by_id' && action.placeId) {
+            const local = places.find((p) => p.overture_id === action.placeId) || mapPlaces.find((p) => p.overture_id === action.placeId);
+            if (local) {
+              handleOpenReach(local);
+            } else {
+              try {
+                const res = await fetch(`/api/reach/contact?placeId=${encodeURIComponent(action.placeId)}`);
+                const d = await res.json();
+                if (d.success && d.place) handleOpenReach(d.place);
+              } catch (_) {}
+            }
+          }
+        }}
       />
 
       {activeModal === 'token_usage' && (

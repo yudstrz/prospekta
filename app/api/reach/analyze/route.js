@@ -53,7 +53,7 @@ export async function POST(request) {
       await consumeTenantQuota(tid, 'ai');
     }
 
-    const intelResult = await performCompanyIntelligence({ placeId, manualText, websiteUrl, lang, tenantId: tid });
+    const intelResult = await performCompanyIntelligence({ placeId, manualText, websiteUrl, lang, tenantId: tid, userId: session?.uid || null });
 
     if (!intelResult.success) {
       return NextResponse.json(

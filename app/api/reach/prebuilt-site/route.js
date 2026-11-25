@@ -223,7 +223,7 @@ export async function POST(request) {
 
     if (!analysis) {
       try {
-        const intel = await performCompanyIntelligence({ placeId, lang });
+        const intel = await performCompanyIntelligence({ placeId, lang, tenantId: tid, userId: session?.uid || null });
         if (intel.success && intel.analysis) {
           analysis = intel.analysis;
         }
@@ -300,7 +300,8 @@ export async function POST(request) {
       rating: googleRating,
       reviewsCount,
       lang,
-      tenantId: tid
+      tenantId: tid,
+      userId: session?.uid || null
     });
 
     const siteId = `site_${Date.now()}_${slug}`;
