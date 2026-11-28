@@ -1027,7 +1027,11 @@ export default function DashboardPage() {
           <nav className="prospekta-nav-segments desktop-only-flex" aria-label="Navigasi 4 Pilar Prospekta">
             <button
               type="button"
-              className="prospekta-nav-item is-active"
+              className={`prospekta-nav-item ${!isAiPanelOpen ? 'is-active' : ''}`}
+              onClick={() => {
+                setIsAiPanelOpen(false);
+                window.scrollTo({ top: 0, behavior: 'smooth' });
+              }}
               title={tx('Geospatial mapping and prospect radar', 'Pemetaan wilayah & radar prospek')}
               style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
             >
@@ -1062,7 +1066,7 @@ export default function DashboardPage() {
 
             <button
               type="button"
-              className="prospekta-nav-item"
+              className={`prospekta-nav-item ${isAiPanelOpen ? 'is-active' : ''}`}
               onClick={() => setIsAiPanelOpen((v) => !v)}
               title={tx('Open Prospekta In-App AI Assistant', 'Buka Asisten AI Prospekta')}
               style={{ display: 'inline-flex', alignItems: 'center', gap: '6px' }}
@@ -1087,10 +1091,10 @@ export default function DashboardPage() {
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             <button
               type="button"
-              className="btn btn-secondary btn-icon-only"
+              className="btn btn-secondary btn-icon-only mobile-only-inline-flex"
               onClick={() => setActiveModal('mcp_plugin')}
-              title="Pengaturan Integrasi AI (API Key)"
-              aria-label="Integrasi AI"
+              title={tx('AI Integration & API Key', 'Pengaturan Integrasi AI (API Key)')}
+              aria-label={tx('AI Integration', 'Integrasi AI')}
               style={{ padding: '0.4rem', minHeight: '38px', minWidth: '38px' }}
             >
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
@@ -2059,7 +2063,7 @@ export default function DashboardPage() {
             <option value="modern">{lang === 'en' ? 'Modern Website' : 'Website Modern'}</option>
           </select>
 
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginLeft: 'auto', flexWrap: 'wrap' }}>
+          <div className="prospekta-filter-actions">
             <button
               type="button"
               className="btn btn-primary"
@@ -2139,6 +2143,18 @@ export default function DashboardPage() {
 
           <button
             type="button"
+            className={`prospekta-chip ${hasEmail ? 'is-active' : ''}`}
+            onClick={() => {
+              setHasEmail(!hasEmail);
+              setPage(1);
+            }}
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+            <span>{tx('Has Email', 'Ada Email')}</span>
+          </button>
+
+          <button
+            type="button"
             className={`prospekta-chip ${hasSentOutreachFilter ? 'is-active' : ''}`}
             onClick={() => {
               setHasSentOutreachFilter(!hasSentOutreachFilter);
@@ -2147,16 +2163,6 @@ export default function DashboardPage() {
           >
             <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
             <span>{tx('Has Proposal', 'Ada Proposal')}</span>
-          </button>
-
-          <button
-            type="button"
-            className="prospekta-chip"
-            onClick={() => setActiveModal('mcp_plugin')}
-            style={{ borderColor: 'var(--border-focus)', color: 'var(--accent-text)', fontWeight: 600 }}
-            title={tx('Manage AI API Key (BYOK) & Email Connector', 'Kelola API Key AI (BYOK) & Konektor Email')}
-          >
-            <span>{tx('AI Key & Email', 'Integrasi AI & Email')}</span>
           </button>
 
           <button
@@ -2224,7 +2230,7 @@ export default function DashboardPage() {
             </>
           )}
 
-          {(search || bidangUsaha !== 'all' || websiteCondition !== 'all' || hasWebsite || noWebsite || hasPhone || noPhone || hasPrebuiltSiteFilter || hasSentOutreachFilter || hasPic || hasLinkedin || onlyPersonalLeads) && (
+          {(search || bidangUsaha !== 'all' || websiteCondition !== 'all' || hasWebsite || noWebsite || hasPhone || noPhone || hasEmail || hasPrebuiltSiteFilter || hasSentOutreachFilter || hasPic || hasLinkedin || onlyPersonalLeads) && (
             <button
               type="button"
               className="prospekta-chip"
@@ -2236,6 +2242,7 @@ export default function DashboardPage() {
                 setNoWebsite(false);
                 setHasPhone(false);
                 setNoPhone(false);
+                setHasEmail(false);
                 setHasPrebuiltSiteFilter(false);
                 setHasSentOutreachFilter(false);
                 setHasPic(false);

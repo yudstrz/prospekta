@@ -24,7 +24,7 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
   const [saving, setSaving] = useState(false);
   const [statusMsg, setStatusMsg] = useState(null);
   const [showAdvancedTg, setShowAdvancedTg] = useState(false);
-  const [showByok, setShowByok] = useState(false);
+  const [gcalCustomMode, setGcalCustomMode] = useState(false);
   const [isCrawlerOpen, setIsCrawlerOpen] = useState(false);
 
   // Team state
@@ -123,6 +123,7 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
             feat_telegram_alerts: data.settings.feat_telegram_alerts !== undefined ? Number(data.settings.feat_telegram_alerts) : 0,
             feat_auto_discovery: data.settings.feat_auto_discovery !== undefined ? Number(data.settings.feat_auto_discovery) : 0,
           }));
+          setGcalCustomMode(Boolean(data.settings.calendly_url));
         }
       } catch (err) {
         setStatusMsg({ type: 'error', text: 'Gagal memuat pengaturan: ' + err.message });
@@ -230,6 +231,7 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
         telegram_bot_token: '',
         llm_key: '',
       }));
+      setGcalCustomMode(Boolean(data.settings?.calendly_url));
       if (onSuccess) onSuccess(data.settings);
     } catch (err) {
       setStatusMsg({ type: 'error', text: err.message });
@@ -325,18 +327,6 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
     }
   };
 
-  const navTabStyle = (tabKey) => ({
-    padding: '0.55rem 0.85rem',
-    background: 'none',
-    border: 'none',
-    borderBottom: activeTab === tabKey ? '2px solid #2563eb' : '2px solid transparent',
-    color: activeTab === tabKey ? 'var(--text-main)' : 'var(--text-muted)',
-    fontWeight: activeTab === tabKey ? 600 : 500,
-    fontSize: '0.85rem',
-    cursor: 'pointer',
-    whiteSpace: 'nowrap',
-  });
-
   const [pdfUploading, setPdfUploading] = useState(false);
   const [pdfError, setPdfError] = useState(null);
   const [pdfSuccess, setPdfSuccess] = useState(null);
@@ -415,37 +405,59 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
           </div>
 
           {/* Tab Navigation */}
-          <div
-            style={{
-              display: 'flex',
-              gap: '4px',
-              borderBottom: '1px solid var(--border-subtle)',
-              padding: '0.5rem 1.25rem 0',
-              overflowX: 'auto',
-              scrollbarWidth: 'none',
-              msOverflowStyle: 'none',
-              WebkitOverflowScrolling: 'touch',
-              flexShrink: 0,
-              boxSizing: 'border-box',
-              width: '100%',
-            }}
-          >
-            <button type="button" onClick={() => setActiveTab('profile')} style={navTabStyle('profile')}>
-              Profil Bisnis &amp; Produk
+          <div className="tenant-settings-tabs" role="tablist" aria-label="Kategori Pengaturan">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'profile'}
+              onClick={() => setActiveTab('profile')}
+              className={`tenant-settings-tab-btn ${activeTab === 'profile' ? 'is-active' : ''}`}
+            >
+              Profil Bisnis
             </button>
-            <button type="button" onClick={() => setActiveTab('targeting')} style={navTabStyle('targeting')}>
-              Jarak &amp; Target Wilayah
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'targeting'}
+              onClick={() => setActiveTab('targeting')}
+              className={`tenant-settings-tab-btn ${activeTab === 'targeting' ? 'is-active' : ''}`}
+            >
+              Target &amp; Radius
             </button>
-            <button type="button" onClick={() => setActiveTab('modules')} style={navTabStyle('modules')}>
-              Fitur &amp; Otomasi
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'modules'}
+              onClick={() => setActiveTab('modules')}
+              className={`tenant-settings-tab-btn ${activeTab === 'modules' ? 'is-active' : ''}`}
+            >
+              Otomasi
             </button>
-            <button type="button" onClick={() => setActiveTab('email')} style={navTabStyle('email')}>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'email'}
+              onClick={() => setActiveTab('email')}
+              className={`tenant-settings-tab-btn ${activeTab === 'email' ? 'is-active' : ''}`}
+            >
               Email Pengirim
             </button>
-            <button type="button" onClick={() => setActiveTab('telegram')} style={navTabStyle('telegram')}>
-              Jadwal &amp; Notifikasi
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'telegram'}
+              onClick={() => setActiveTab('telegram')}
+              className={`tenant-settings-tab-btn ${activeTab === 'telegram' ? 'is-active' : ''}`}
+            >
+              Jadwal &amp; Kuota
             </button>
-            <button type="button" onClick={() => setActiveTab('team')} style={navTabStyle('team')}>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={activeTab === 'team'}
+              onClick={() => setActiveTab('team')}
+              className={`tenant-settings-tab-btn ${activeTab === 'team' ? 'is-active' : ''}`}
+            >
               Anggota Tim
             </button>
           </div>
@@ -1233,10 +1245,15 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                     ].map((m) => {
                       const isActive = settings[m.key] === 1;
                       return (
-                        <div
+                        <button
                           key={m.key}
+                          type="button"
+                          role="switch"
+                          aria-checked={isActive}
                           onClick={() => toggleFeature(m.key)}
                           style={{
+                            width: '100%',
+                            textAlign: 'left',
                             display: 'flex',
                             alignItems: 'center',
                             justifyContent: 'space-between',
@@ -1245,6 +1262,8 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                             border: `1px solid ${isActive ? 'rgba(37,99,235,0.4)' : 'var(--border-subtle)'}`,
                             backgroundColor: isActive ? 'rgba(37,99,235,0.04)' : 'var(--bg-app)',
                             cursor: 'pointer',
+                            color: 'inherit',
+                            fontFamily: 'inherit',
                           }}
                         >
                           <div style={{ flex: 1, paddingRight: '16px' }}>
@@ -1271,10 +1290,8 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                             </div>
                           </div>
 
-                          {/* Native Accessible Switch Toggle */}
-                          <div
-                            role="switch"
-                            aria-checked={isActive}
+                          <span
+                            aria-hidden="true"
                             style={{
                               width: '44px',
                               height: '24px',
@@ -1285,7 +1302,7 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                               flexShrink: 0,
                             }}
                           >
-                            <div
+                            <span
                               style={{
                                 width: '18px',
                                 height: '18px',
@@ -1298,8 +1315,8 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                                 boxShadow: '0 1px 3px rgba(0,0,0,0.3)',
                               }}
                             />
-                          </div>
-                        </div>
+                          </span>
+                        </button>
                       );
                     })}
                   </div>
@@ -1330,11 +1347,14 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                   />
                 )}
 
-                {/* TAB 5: Telegram, Kuota & BYOK */}
+                {/* TAB 5: Telegram, Kuota & Jadwal */}
                 {activeTab === 'telegram' && (
                   <>
                     {/* Ringkasan Kuota Paket Bulanan (Managed Pool SaaS) */}
-                    {settings.usage && (
+                    {settings.usage && (() => {
+                      const aiUnlimited = settings.llm_key_set || Number(settings.usage.ai_limit) >= 90000;
+                      const enrichUnlimited = Number(settings.usage.enrich_limit) >= 90000;
+                      return (
                       <div
                         style={{
                           padding: '12px 14px',
@@ -1364,22 +1384,22 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                             Paket {settings.usage.plan}
                           </span>
                         </div>
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '12px' }}>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '12px' }}>
                           <div>
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '4px' }}>
-                              <span style={{ color: 'var(--text-muted)' }}>Kredit AI {settings.llm_key_set ? '(BYOK Aktif)' : ''}</span>
+                              <span style={{ color: 'var(--text-muted)' }}>Kredit AI {settings.llm_key_set ? '(Key Sendiri)' : ''}</span>
                               <strong style={{ color: 'var(--text-main)' }}>
-                                {settings.llm_key_set ? 'Unlimited' : `${settings.usage.ai_used} / ${settings.usage.ai_limit}`}
+                                {aiUnlimited ? `${settings.usage.ai_used} / Unlimited` : `${settings.usage.ai_used} / ${settings.usage.ai_limit}`}
                               </strong>
                             </div>
                             <div style={{ height: '6px', borderRadius: '3px', backgroundColor: 'var(--border-subtle)', overflow: 'hidden' }}>
                               <div
                                 style={{
                                   height: '100%',
-                                  width: settings.llm_key_set
+                                  width: aiUnlimited
                                     ? '100%'
                                     : `${Math.min(100, Math.round((settings.usage.ai_used / Math.max(1, settings.usage.ai_limit)) * 100))}%`,
-                                  backgroundColor: settings.llm_key_set ? '#10b981' : '#2563eb',
+                                  backgroundColor: aiUnlimited ? '#10b981' : '#2563eb',
                                 }}
                               />
                             </div>
@@ -1388,14 +1408,16 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                             <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '0.75rem', marginBottom: '4px' }}>
                               <span style={{ color: 'var(--text-muted)' }}>Riset &amp; Enrich Kontak</span>
                               <strong style={{ color: 'var(--text-main)' }}>
-                                {settings.usage.enrich_used} / {settings.usage.enrich_limit}
+                                {enrichUnlimited ? `${settings.usage.enrich_used} / Unlimited` : `${settings.usage.enrich_used} / ${settings.usage.enrich_limit}`}
                               </strong>
                             </div>
                             <div style={{ height: '6px', borderRadius: '3px', backgroundColor: 'var(--border-subtle)', overflow: 'hidden' }}>
                               <div
                                 style={{
                                   height: '100%',
-                                  width: `${Math.min(100, Math.round((settings.usage.enrich_used / Math.max(1, settings.usage.enrich_limit)) * 100))}%`,
+                                  width: enrichUnlimited
+                                    ? '100%'
+                                    : `${Math.min(100, Math.round((settings.usage.enrich_used / Math.max(1, settings.usage.enrich_limit)) * 100))}%`,
                                   backgroundColor: '#10b981',
                                 }}
                               />
@@ -1406,7 +1428,8 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                           Seluruh infrastruktur database, pencarian web, dan AI sudah dikelola otomatis oleh platform tanpa perlu mengatur API key sendiri.
                         </span>
                       </div>
-                    )}
+                      );
+                    })()}
 
                     {/* Konfigurasi Notifikasi Telegram */}
                     <div
@@ -1427,7 +1450,7 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                         <div style={{ fontSize: '0.75rem', color: 'var(--text-muted)' }}>
                           {settings.telegram_chat_id
                             ? `Terhubung ke Chat ID: ${settings.telegram_chat_id}`
-                            : 'Masukkan Chat ID tujuan dan opsional Bot Token pribadi lalu klik Simpan Perubahan.'}
+                            : 'Masukkan Chat ID tujuan dan opsional Bot Token pribadi lalu klik Simpan Pengaturan.'}
                         </div>
                       </div>
 
@@ -1533,36 +1556,35 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '8px' }}>
                         <button
                           type="button"
-                          onClick={() => setSettings({ ...settings, calendly_url: '' })}
+                          onClick={() => {
+                            setGcalCustomMode(false);
+                            setSettings({ ...settings, calendly_url: '' });
+                          }}
                           style={{
                             textAlign: 'left',
                             padding: '10px 12px',
                             borderRadius: '8px',
-                            border: !settings.calendly_url ? '1.5px solid var(--primary)' : '1px solid var(--border-subtle)',
-                            backgroundColor: !settings.calendly_url ? 'rgba(37, 99, 235, 0.08)' : 'var(--bg-card)',
+                            border: !gcalCustomMode && !settings.calendly_url ? '1.5px solid var(--primary)' : '1px solid var(--border-subtle)',
+                            backgroundColor: !gcalCustomMode && !settings.calendly_url ? 'rgba(37, 99, 235, 0.08)' : 'var(--bg-card)',
                             cursor: 'pointer',
                             color: 'var(--text-main)',
                           }}
                         >
                           <div style={{ fontSize: '0.8rem', fontWeight: 700 }}>Redirect Google Calendar (Tanpa Connect)</div>
                           <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
-                            Langsung mengarahkan tombol jadwal ke Google Calendar resmi (`calendar.google.com`).
+                            Langsung mengarahkan tombol jadwal ke Google Calendar resmi (calendar.google.com).
                           </div>
                         </button>
 
                         <button
                           type="button"
-                          onClick={() => {
-                            if (!settings.calendly_url) {
-                              setSettings({ ...settings, calendly_url: 'https://calendar.app.google/' });
-                            }
-                          }}
+                          onClick={() => setGcalCustomMode(true)}
                           style={{
                             textAlign: 'left',
                             padding: '10px 12px',
                             borderRadius: '8px',
-                            border: settings.calendly_url ? '1.5px solid var(--primary)' : '1px solid var(--border-subtle)',
-                            backgroundColor: settings.calendly_url ? 'rgba(37, 99, 235, 0.08)' : 'var(--bg-card)',
+                            border: gcalCustomMode || settings.calendly_url ? '1.5px solid var(--primary)' : '1px solid var(--border-subtle)',
+                            backgroundColor: gcalCustomMode || settings.calendly_url ? 'rgba(37, 99, 235, 0.08)' : 'var(--bg-card)',
                             cursor: 'pointer',
                             color: 'var(--text-main)',
                           }}
@@ -1574,7 +1596,7 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                         </button>
                       </div>
 
-                      {Boolean(settings.calendly_url) && (
+                      {(gcalCustomMode || Boolean(settings.calendly_url)) && (
                         <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
                           <input
                             type="url"

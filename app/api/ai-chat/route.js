@@ -40,9 +40,9 @@ export async function GET(request) {
       ...(agnesAvailable
         ? [{
             provider: 'agnes',
-            name: 'Agnes AI (Platform .env)',
+            name: 'Agnes AI',
             modelLabel: getModel('agnes', session?.role),
-            maskedKey: 'ENV Platform',
+            maskedKey: 'Bawaan Platform',
             isActive: !active,
             isPlatformDefault: true,
           }]
@@ -61,10 +61,10 @@ export async function GET(request) {
       configured: Boolean(active || agnesAvailable),
       activeSource: active ? 'byok' : (agnesAvailable ? 'agnes' : null),
       provider: active?.provider || (agnesAvailable ? 'agnes' : null),
-      providerName: providerMeta?.name || (agnesAvailable ? 'Agnes AI (Bawaan .env)' : null),
+      providerName: providerMeta?.name || (agnesAvailable ? 'Agnes AI Platform' : null),
       model: resolvedModel,
       modelLabel: providerMeta?.modelLabel || (agnesAvailable ? 'Agnes Platform Flash' : 'Otomatis Model Terbaru'),
-      maskedKey: active?.masked_key || (agnesAvailable ? 'ENV Platform' : null),
+      maskedKey: active?.masked_key || (agnesAvailable ? 'Bawaan Platform' : null),
       savedProviders,
     });
   } catch (err) {

@@ -2,14 +2,8 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { copyToClipboard } from '@/lib/clipboard';
+import { useI18n } from '@/lib/i18n';
 import { ProspektaMark } from './ProspektaLogo';
-
-const QUICK_PROMPTS = [
-  'Scan bisnis baru di radius area aktif',
-  'Filter ke tabel prospek yang belum punya website',
-  'Analisis mendalam & buat proposal untuk prospek teratas',
-  'Buat website preview untuk prospek tanpa website',
-];
 
 const MUTATING_TOOLS = new Set([
   'scan_area_prospects',
@@ -31,6 +25,13 @@ export default function AiAssistantPanel({
   isOpen = false,
   onToggleOpen,
 }) {
+  const { tx } = useI18n();
+  const quickPrompts = [
+    tx('Scan new businesses within active radius', 'Scan bisnis baru di radius area aktif'),
+    tx('Filter prospects without a website in table', 'Filter ke tabel prospek yang belum punya website'),
+    tx('Deep research & draft proposal for top prospect', 'Analisis mendalam & buat proposal untuk prospek teratas'),
+    tx('Build website preview for prospects without a site', 'Buat website preview untuk prospek tanpa website'),
+  ];
   const [status, setStatus] = useState({ loading: true, configured: false, provider: null, providerName: null, model: null, modelLabel: '', savedProviders: [] });
   const [selectedProvider, setSelectedProvider] = useState('');
   const [messages, setMessages] = useState([]);
@@ -254,20 +255,30 @@ export default function AiAssistantPanel({
     >
       {/* Header */}
       <div style={{ padding: '12px 14px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', background: 'var(--bg-app)' }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '10px', minWidth: 0, flex: 1 }}>
           <ProspektaMark size={28} />
-          <div style={{ minWidth: 0 }}>
+          <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ fontWeight: 700, fontSize: '0.92rem', display: 'flex', alignItems: 'center', gap: '6px' }}>
               <span>Prospekta AI Assistant</span>
             </div>
-            <div style={{ fontSize: '0.72rem', fontWeight: 600, color: status.configured ? 'var(--success-text)' : 'var(--warning-text)', display: 'flex', alignItems: 'center', gap: '5px', flexWrap: 'wrap' }}>
-              <span aria-hidden="true" style={{ width: '6px', height: '6px', borderRadius: '50%', background: status.configured ? '#10b981' : '#d97706' }} />
+            <div
+              style={{
+                fontSize: '0.72rem',
+                fontWeight: 600,
+                color: status.configured ? 'var(--success-text)' : 'var(--warning-text)',
+                display: 'flex',
+                alignItems: 'center',
+                gap: '5px',
+                minWidth: 0,
+              }}
+            >
+              <span aria-hidden="true" style={{ width: '6px', height: '6px', borderRadius: '50%', background: status.configured ? '#10b981' : '#d97706', flexShrink: 0 }} />
               {status.configured ? (
-                <span>
-                  {currentProviderObj?.name || status.providerName} &bull; {status.model ? `${status.model} (Otomatis)` : (currentProviderObj?.modelLabel || 'Model Terbaru')}
+                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  {currentProviderObj?.name || status.providerName} &bull; {status.model || tx('Auto Latest', 'Otomatis')}
                 </span>
               ) : (
-                <span>API Key belum terhubung</span>
+                <span>{tx('API Key not connected', 'API Key belum terhubung')}</span>
               )}
             </div>
           </div>
@@ -280,14 +291,14 @@ export default function AiAssistantPanel({
             onClick={onOpenAiSettings}
             style={{ minHeight: '36px', fontSize: '0.74rem', padding: '0 10px' }}
           >
-            Agnes / API Key
+            {tx('AI Key Settings', 'Atur API Key')}
           </button>
           <button
             type="button"
             className="btn btn-secondary btn-sm"
             onClick={() => setWide((v) => !v)}
-            title={wide ? 'Perkecil panel' : 'Perluas panel'}
-            aria-label={wide ? 'Perkecil panel' : 'Perluas panel'}
+            title={wide ? tx('Shrink panel', 'Perkecil panel') : tx('Expand panel', 'Perluas panel')}
+            aria-label={wide ? tx('Shrink panel', 'Perkecil panel') : tx('Expand panel', 'Perluas panel')}
             style={{ minHeight: '36px', minWidth: '36px', padding: '0 8px', fontSize: '0.78rem' }}
           >
             {wide ? '◱' : '⛶'}
@@ -296,7 +307,7 @@ export default function AiAssistantPanel({
             type="button"
             className="btn btn-secondary btn-sm"
             onClick={() => onToggleOpen?.(false)}
-            aria-label="Tutup panel AI"
+            aria-label={tx('Close AI panel', 'Tutup panel AI')}
             style={{ minHeight: '36px', minWidth: '36px', padding: '0 8px' }}
           >
             &times;
@@ -307,20 +318,20 @@ export default function AiAssistantPanel({
       {/* Active Provider/Model + Area Context Bar */}
       <div style={{ padding: '8px 14px', borderBottom: '1px solid var(--border-subtle)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '8px', flexWrap: 'wrap', fontSize: '0.74rem', color: 'var(--text-muted)' }}>
         <span>
-          Area: <strong style={{ color: 'var(--text-main)' }}>{activeAnchor?.name || 'Semua Area'}</strong> ({radiusKm || 2} km)
+          Area: <strong style={{ color: 'var(--text-main)' }}>{activeAnchor?.name || tx('All Areas', 'Semua Area')}</strong> ({radiusKm || 2} km)
         </span>
         {status.configured && (
           <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
             {status.savedProviders?.length > 0 && (
               <select
-                aria-label="Pilih provider aktif"
+                aria-label={tx('Select active provider', 'Pilih provider aktif')}
                 value={selectedProvider}
                 onChange={(e) => handleProviderSwitch(e.target.value)}
                 style={{ background: 'var(--bg-app)', color: 'var(--text-main)', border: '1px solid var(--border-subtle)', borderRadius: '6px', padding: '4px 8px', fontSize: '0.74rem', minHeight: '36px' }}
               >
                 {status.savedProviders.map((sp) => (
                   <option key={sp.provider} value={sp.provider}>
-                    {sp.isPlatformDefault ? `${sp.name}` : `${sp.name} (Key Sendiri)`}
+                    {sp.isPlatformDefault ? sp.name : `${sp.name} (${tx('Own Key', 'Key Sendiri')})`}
                   </option>
                 ))}
               </select>
@@ -342,9 +353,9 @@ export default function AiAssistantPanel({
       <div style={{ flex: 1, overflowY: 'auto', padding: '14px', display: 'flex', flexDirection: 'column', gap: '12px' }}>
         {!status.loading && !status.configured && messages.length === 0 && (
           <div style={{ background: 'var(--bg-app)', border: '1px solid var(--border-subtle)', borderRadius: '10px', padding: '14px', fontSize: '0.82rem', lineHeight: 1.55 }}>
-            <strong style={{ display: 'block', marginBottom: '6px', fontSize: '0.88rem' }}>Hubungkan API Key AI Anda (BYOK)</strong>
+            <strong style={{ display: 'block', marginBottom: '6px', fontSize: '0.88rem' }}>{tx('Connect Your AI API Key', 'Hubungkan API Key AI Anda')}</strong>
             <p style={{ margin: '0 0 12px', color: 'var(--text-muted)' }}>
-              Masukkan API Key Gemini, OpenAI, atau Claude langsung di akun Prospekta untuk mencari prospek, membuat draf proposal PDF, dan membangun website preview tanpa pengaturan komputer lokal.
+              {tx('Add your Gemini, OpenAI, or Claude API Key in Prospekta to research prospects, draft PDF proposals, and build preview websites.', 'Masukkan API Key Gemini, OpenAI, atau Claude langsung di akun Prospekta untuk mencari prospek, membuat draf proposal PDF, dan membangun website preview.')}
             </p>
             <button
               type="button"
@@ -352,7 +363,7 @@ export default function AiAssistantPanel({
               onClick={onOpenAiSettings}
               style={{ minHeight: '38px' }}
             >
-              Atur API Key Sekarang
+              {tx('Configure API Key', 'Atur API Key Sekarang')}
             </button>
           </div>
         )}
@@ -360,10 +371,10 @@ export default function AiAssistantPanel({
         {messages.length === 0 && (
           <div>
             <div style={{ fontSize: '0.74rem', fontWeight: 600, color: 'var(--text-muted)', marginBottom: '8px' }}>
-              Perintah Cepat:
+              {tx('Quick Commands:', 'Perintah Cepat:')}
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-              {QUICK_PROMPTS.map((q) => (
+              {quickPrompts.map((q) => (
                 <button
                   key={q}
                   type="button"
@@ -498,7 +509,7 @@ export default function AiAssistantPanel({
         {sending && (
           <div role="status" style={{ padding: '10px 12px', borderRadius: '10px', background: 'var(--bg-app)', border: '1px solid var(--border-subtle)', fontSize: '0.8rem', color: 'var(--text-muted)', display: 'flex', alignItems: 'center', gap: '8px' }}>
             <span style={{ width: '8px', height: '8px', borderRadius: '50%', background: 'var(--primary)', flexShrink: 0 }} />
-            <span>{liveStatus || 'Sedang memproses...'}</span>
+            <span>{liveStatus || tx('Processing...', 'Sedang memproses...')}</span>
           </div>
         )}
         <div ref={endRef} />
@@ -515,12 +526,12 @@ export default function AiAssistantPanel({
         <input
           type="text"
           className="text-input"
-          aria-label="Tulis instruksi untuk AI Assistant"
-          placeholder="Tanya tentang prospek area ini, buat proposal, atau website..."
+          aria-label={tx('Write instruction for AI Assistant', 'Tulis instruksi untuk AI Assistant')}
+          placeholder={tx('Ask AI about area prospects, proposals, or site...', 'Tanya AI soal prospek, proposal, atau web...')}
           value={input}
           onChange={(e) => setInput(e.target.value)}
           disabled={sending}
-          style={{ flex: 1, minHeight: '40px' }}
+          style={{ flex: 1, minWidth: 0, minHeight: '40px' }}
         />
         <button
           type="submit"
@@ -528,7 +539,7 @@ export default function AiAssistantPanel({
           disabled={sending || !input.trim()}
           style={{ minHeight: '40px', padding: '0 14px', flexShrink: 0 }}
         >
-          {sending ? 'Proses...' : 'Kirim'}
+          {sending ? tx('Working...', 'Proses...') : tx('Send', 'Kirim')}
         </button>
       </form>
     </aside>

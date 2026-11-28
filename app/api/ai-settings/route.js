@@ -28,9 +28,9 @@ function buildSettingsPayload(keys, resolvedLatestModel = null, role = 'user') {
     agnesModel,
     activeSource: active ? 'byok' : (agnesAvailable ? 'agnes' : null),
     activeProvider: active?.provider || (agnesAvailable ? 'agnes' : null),
-    activeProviderName: activeMeta?.name || (activeIsAgnes ? 'Agnes AI (Bawaan Platform .env)' : null),
+    activeProviderName: activeMeta?.name || (activeIsAgnes ? 'Agnes AI Platform' : null),
     activeModel: active ? (resolvedLatestModel || activeMeta?.modelLabel || null) : (activeIsAgnes ? agnesModel : null),
-    maskedKey: active?.masked_key || (activeIsAgnes ? 'ENV Platform' : null),
+    maskedKey: active?.masked_key || (activeIsAgnes ? 'Bawaan Platform' : null),
   };
 }
 
@@ -108,7 +108,7 @@ export async function PATCH(request) {
       provider: body.provider,
     });
     const activeName = norm === 'agnes'
-      ? 'Agnes AI (Bawaan Platform .env)'
+      ? 'Agnes AI Platform'
       : (AI_PROVIDERS[norm]?.name || body.provider);
     return NextResponse.json({
       success: true,
