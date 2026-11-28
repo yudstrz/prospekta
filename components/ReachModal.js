@@ -208,9 +208,6 @@ export default function ReachModal({ place: initialPlace, onClose, onUpdatePlace
   const [includePreviewLink, setIncludePreviewLink] = useState(false);
   const [skeletonPattern, setSkeletonPattern] = useState(0);
 
-  // Apollo Lookup state
-  const [apolloScanning, setApolloScanning] = useState(false);
-  const [apolloStatusMessage, setApolloStatusMessage] = useState(null);
   const [showDorkMenu, setShowDorkMenu] = useState(false);
 
   // Outreach & Quota State
@@ -270,7 +267,7 @@ export default function ReachModal({ place: initialPlace, onClose, onUpdatePlace
   const [authorName, setAuthorName] = useState(currentSession?.isSuperadmin ? 'Tim Prospekta' : (currentSession?.company_name || 'Tim Kami'));
   const [addingNote, setAddingNote] = useState(false);
 
-  // Proposal & Calendly Accordion State
+  // Proposal & Google Calendar Accordion State
   const [proposalAccordionOpen, setProposalAccordionOpen] = useState(false);
   const [proposal, setProposal] = useState(null);
   const [proposalLoading, setProposalLoading] = useState(false);
@@ -279,7 +276,6 @@ export default function ReachModal({ place: initialPlace, onClose, onUpdatePlace
   const [isEditingProposal, setIsEditingProposal] = useState(false);
   const [savingProposal, setSavingProposal] = useState(false);
   const [copySuccess, setCopySuccess] = useState(false);
-  const [showCalendlyEmbed, setShowCalendlyEmbed] = useState(false);
 
   // Prebuilt Dynamic Website Preview State
   const [prebuiltSite, setPrebuiltSite] = useState(null);
@@ -721,46 +717,6 @@ export default function ReachModal({ place: initialPlace, onClose, onUpdatePlace
     }
   };
 
-  // Handle Apollo lookup API
-  const handleApolloLookup = async () => {
-    setApolloScanning(true);
-    setApolloStatusMessage(null);
-    try {
-      const res = await fetch(`/api/reach/contact?placeId=${place.overture_id}&lookup=apollo`);
-      const data = await res.json();
-      if (data.success && data.person) {
-        const updated = {
-          ...place,
-          pic_name: data.person.name || place.pic_name,
-          email: data.person.email || place.email,
-          phone: data.person.phone || place.phone,
-          linkedin_url: data.person.linkedin_url || place.linkedin_url
-        };
-        setPlace(updated);
-        setSgForm((prev) => ({
-          ...prev,
-          dmName: data.person.name || prev.dmName,
-          dmTitle: data.person.title || prev.dmTitle,
-          verifiedEmail: data.person.email || prev.verifiedEmail,
-          phone: data.person.phone || prev.phone
-        }));
-        if (onUpdatePlace) onUpdatePlace(updated);
-        setApolloStatusMessage({ type: 'success', text: `PIC teridentifikasi: ${data.person.name} (${data.person.title || 'Executive'})` });
-      } else {
-        setApolloStatusMessage({
-          type: 'warning',
-          text: data.isFreePlan
-            ? 'Akun Apollo Free membatasi lookup via API backend. Gunakan tombol "Apollo.io" di atas untuk melihat data di browser, lalu masukkan ke form.'
-            : (data.error || 'PIC belum ditemukan di database Apollo.')
-        });
-      }
-    } catch (err) {
-      setApolloStatusMessage({ type: 'error', text: `Gagal memindai Apollo: ${err.message}` });
-    } finally {
-      setApolloScanning(false);
-    }
-  };
-
   // Select discovered key person as active PIC
   const handleSelectKeyPerson = async (person) => {
     if (!person || !person.name) return;
@@ -777,7 +733,7 @@ export default function ReachModal({ place: initialPlace, onClose, onUpdatePlace
       phone: newPhone || prev.phone
     }));
 
-    setApolloStatusMessage({
+    setSgStatusMsg({
       type: 'success',
       text: `PIC aktif diset ke ${newName} (${newTitle || 'Pimpinan Terpilih'}). Klik "Verifikasi & Simpan Lead" untuk menyimpan permanen.`
     });
@@ -1143,7 +1099,10 @@ export default function ReachModal({ place: initialPlace, onClose, onUpdatePlace
     manualBodyTemplate
   });
 
-  const calendlyUrl = tenantSettings?.calendly_url || process.env.NEXT_PUBLIC_CALENDAR_URL || 'https://calendar.google.com';
+  const rawCustomCalendarUrl = (tenantSettings?.calendly_url || '').trim();
+  const isCalendarConnected = Boolean(rawCustomCalendarUrl && rawCustomCalendarUrl !== 'https://calendar.google.com' && rawCustomCalendarUrl !== 'https://calendar.app.google/');
+  const calendlyUrl = isCalendarConnected ? rawCustomCalendarUrl : (process.env.NEXT_PUBLIC_CALENDAR_URL || 'https://calendar.google.com');
+  const googleCalendarEventUrl = `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${encodeURIComponent(`Meeting: ${place.name}`)}&details=${encodeURIComponent(`Diskusi solusi untuk ${place.name}${place.address ? ` (${place.address})` : ''}`)}${(sgForm.verifiedEmail || place.email) ? `&add=${encodeURIComponent(sgForm.verifiedEmail || place.email)}` : ''}`;
   const activeEmailSubject = (emailMode === 'ai' && aiEmail?.subject) ? aiEmail.subject : sgEmail.subject;
   const calendlySuffix = includeCalendly
     ? (outreachLang === 'en'
@@ -1340,15 +1299,6 @@ export default function ReachModal({ place: initialPlace, onClose, onUpdatePlace
                 );
               })()}
               <a
-                href={`https://app.apollo.io/#/people?qOrganizationName=${encodeURIComponent(place.name)}`}
-                target="_blank"
-                rel="noreferrer"
-                className="reach-chip-link"
-                title={tx('Open Apollo.io to find PIC', 'Buka Apollo.io untuk cari PIC')}
-              >
-                <IconSearch /> Apollo.io <IconExternalLink />
-              </a>
-              <a
                 href={`https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(`${place.name} ${isTargetIndonesia ? 'Indonesia' : (place.city || 'Singapore')} CEO OR Director OR Founder OR Manager`)}`}
                 target="_blank"
                 rel="noreferrer"
@@ -1382,16 +1332,6 @@ export default function ReachModal({ place: initialPlace, onClose, onUpdatePlace
                     <span>{tx('3-Pillar Audit & PIC Profile', 'Audit 3 Pilar & Profil PIC')}</span>
                   </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: '8px', flexWrap: 'wrap' }}>
-                    <button
-                      type="button"
-                      className="btn btn-secondary btn-sm"
-                      onClick={handleApolloLookup}
-                      disabled={apolloScanning}
-                      style={{ minHeight: '34px', padding: '0.375rem 0.75rem', fontSize: '0.8125rem', display: 'inline-flex', alignItems: 'center', gap: '5px' }}
-                      title={tx('Scan Apollo API to discover PIC automatically', 'Pindai Apollo API untuk menemukan PIC otomatis')}
-                    >
-                      <IconRefresh /> {apolloScanning ? tx('Scanning...', 'Memindai...') : tx('Scan Apollo API', 'Pindai Apollo API')}
-                    </button>
                     {/* Advanced Google Dorking Multi-Scenario Split Button */}
                     <div style={{ position: 'relative', display: 'inline-block' }}>
                       {(() => {
@@ -1489,12 +1429,6 @@ export default function ReachModal({ place: initialPlace, onClose, onUpdatePlace
                   </div>
                 </div>
 
-                {apolloStatusMessage && (
-                  <div className={`alert alert-${apolloStatusMessage.type === 'success' ? 'success' : apolloStatusMessage.type === 'warning' ? 'warning' : 'danger'}`} style={{ fontSize: '0.8125rem', padding: '0.625rem 0.875rem', margin: 0 }}>
-                    {apolloStatusMessage.text}
-                  </div>
-                )}
-
                 <form onSubmit={handleVerifySgLead} style={{ display: 'flex', flexDirection: 'column', gap: '1.25rem' }}>
                   
                   {/* Group 1: Klaster Industri & Penugasan */}
@@ -1524,7 +1458,7 @@ export default function ReachModal({ place: initialPlace, onClose, onUpdatePlace
                         {!sgForm.dmName && (
                           <div style={{ fontSize: '0.6875rem', color: '#b45309', backgroundColor: '#fef3c7', padding: '3px 6px', borderRadius: '4px', marginTop: '4px', display: 'flex', alignItems: 'center', gap: '4px' }}>
                             <IconAlertTriangle size={12} />
-                            <span>{tx('DM name is empty. Check Apollo / LinkedIn above to avoid spam filters.', 'Nama DM kosong. Cek Apollo / LinkedIn di atas untuk nama pimpinan agar email tidak masuk spam.')}</span>
+                            <span>{tx('DM name is empty. Check LinkedIn above to avoid spam filters.', 'Nama DM kosong. Cek LinkedIn di atas untuk nama pimpinan agar email tidak masuk spam.')}</span>
                           </div>
                         )}
                       </div>
@@ -2799,54 +2733,52 @@ export default function ReachModal({ place: initialPlace, onClose, onUpdatePlace
 
                 {proposalAccordionOpen && (
                   <div className="reach-accordion-content">
-                    {/* Calendly Booking Quick Buttons */}
-                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.875rem', flexWrap: 'wrap', gap: '6px' }}>
-                      <span style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--text-muted)' }}>
-                        {tx('Schedule & Book Meeting:', 'Jadwal & Booking Meeting:')}
-                      </span>
-                      <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                        <button
-                          type="button"
-                          className="btn btn-secondary btn-sm"
-                          style={{ minHeight: '32px', fontSize: '0.75rem', padding: '0.25rem 0.625rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                          onClick={() => setShowCalendlyEmbed(!showCalendlyEmbed)}
-                        >
-                          <IconCalendar /> {showCalendlyEmbed ? tx('Close Calendar', 'Tutup Kalender') : tx('Calendar Embed', 'Kalender Embed')}
-                        </button>
+                    {/* Google Calendar Quick Buttons (Connected Schedule or Direct Redirect) */}
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '0.875rem', flexWrap: 'wrap', gap: '8px', padding: '10px 12px', borderRadius: '8px', backgroundColor: 'var(--bg-app)', border: '1px solid var(--border-subtle)' }}>
+                      <div>
+                        <div style={{ fontSize: '0.78rem', fontWeight: 700, color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
+                          <IconCalendar />
+                          <span>{tx('Google Calendar Scheduling', 'Penjadwalan Google Calendar')}</span>
+                          <span
+                            style={{
+                              fontSize: '0.68rem',
+                              padding: '1px 7px',
+                              borderRadius: '9999px',
+                              backgroundColor: isCalendarConnected ? 'var(--success-bg)' : 'var(--bg-card)',
+                              color: isCalendarConnected ? 'var(--success-text)' : 'var(--text-muted)',
+                              border: '1px solid var(--border-subtle)',
+                            }}
+                          >
+                            {isCalendarConnected ? tx('Connected', 'Terhubung') : tx('Direct Redirect', 'Mode Redirect')}
+                          </span>
+                        </div>
+                        <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                          {isCalendarConnected
+                            ? tx('Your custom Google Calendar booking schedule link is connected.', 'Link jadwal booking Google Calendar Anda terhubung.')
+                            : tx('Not connected to a custom schedule yet; buttons below open Google Calendar directly.', 'Belum dihubungkan ke jadwal kustom; tombol di bawah langsung membuka Google Calendar.')}
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '6px', flexWrap: 'wrap' }}>
                         <a
-                          href="https://calendar.google.com"
-                          target="_blank"
-                          rel="noreferrer"
-                          className="btn btn-secondary btn-sm"
-                          style={{ minHeight: '32px', fontSize: '0.75rem', padding: '0.25rem 0.625rem', display: 'inline-flex', alignItems: 'center', gap: '4px' }}
-                        >
-                          {tx('Bookings', 'Jadwal Masuk')} <IconExternalLink />
-                        </a>
-                        <a
-                          href={calendlyUrl}
+                          href={googleCalendarEventUrl}
                           target="_blank"
                           rel="noreferrer"
                           className="btn btn-primary btn-sm"
-                          style={{ minHeight: '32px', fontSize: '0.75rem', padding: '0.25rem 0.625rem', display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}
+                          style={{ minHeight: '36px', fontSize: '0.75rem', padding: '0 10px', display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}
                         >
-                          {tx('Booking Link', 'Link Booking')} <IconExternalLink />
+                          <IconCalendar /> {tx('Create Event in Google Calendar', 'Buat Jadwal di Google Calendar')} <IconExternalLink />
+                        </a>
+                        <a
+                          href={isCalendarConnected ? calendlyUrl : 'https://calendar.google.com'}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="btn btn-secondary btn-sm"
+                          style={{ minHeight: '36px', fontSize: '0.75rem', padding: '0 10px', display: 'inline-flex', alignItems: 'center', gap: '4px', textDecoration: 'none' }}
+                        >
+                          {isCalendarConnected ? tx('Connected Booking Link', 'Link Booking Terhubung') : tx('Open Google Calendar', 'Buka Google Calendar')} <IconExternalLink />
                         </a>
                       </div>
                     </div>
-
-                    {showCalendlyEmbed && (
-                      <div style={{ marginBottom: '1rem', borderRadius: 'var(--radius-sm)', overflow: 'hidden', border: '1px solid var(--border-subtle)', background: '#ffffff' }}>
-                        <iframe
-                          className="reach-calendly-iframe"
-                          src={calendlyUrl}
-                          width="100%"
-                          height="440"
-                          frameBorder="0"
-                          title="Live Calendly Booking Schedule"
-                          style={{ border: 'none', display: 'block', width: '100%' }}
-                        />
-                      </div>
-                    )}
 
                     {/* Proposal Draft Section */}
                     {!proposal && !proposalLoading && (

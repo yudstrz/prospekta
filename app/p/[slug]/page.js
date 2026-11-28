@@ -142,7 +142,7 @@ export default async function PrebuiltSitePage({ params }) {
 
   const displayRating = (site.google_rating && Number(site.google_rating) > 0) ? Number(site.google_rating).toFixed(1) : '4.9';
   const displayReviewsCount = site.reviews_count || 18;
-  const calendlyUrl = process.env.NEXT_PUBLIC_CALENDAR_URL || process.env.NEXT_PUBLIC_CALENDLY_URL || 'https://calendar.google.com';
+  const googleCalendarUrl = process.env.NEXT_PUBLIC_CALENDAR_URL || 'https://calendar.google.com';
 
   // 4. Resolusi Profil Industri Autentik (Warna Brand Dinamis & Visual Fotografi)
   let storedConfig = null;
@@ -460,7 +460,7 @@ export default async function PrebuiltSitePage({ params }) {
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
             <a 
-              href={calendlyUrl} 
+              href={googleCalendarUrl} 
               target="_blank" 
               rel="noreferrer" 
               style={{ color: '#38bdf8', textDecoration: 'none', fontWeight: 600, fontSize: '12px' }}
@@ -1222,7 +1222,7 @@ export default async function PrebuiltSitePage({ params }) {
               &copy; {new Date().getFullYear()} {site.company_name}. All rights reserved.
             </div>
             <div>
-              Interactive Digital Concept engineered by <a href="/" style={{ color: primaryColor, fontWeight: 600, textDecoration: 'none' }}>Prospekta</a> &bull; <a href={calendlyUrl} target="_blank" rel="noreferrer" style={{ color: '#64748b', textDecoration: 'none' }}>Connect Official Domain</a>
+              Interactive Digital Concept engineered by <a href="/" style={{ color: primaryColor, fontWeight: 600, textDecoration: 'none' }}>Prospekta</a> &bull; <a href={googleCalendarUrl} target="_blank" rel="noreferrer" style={{ color: '#64748b', textDecoration: 'none' }}>Connect Official Domain</a>
             </div>
           </div>
         </div>

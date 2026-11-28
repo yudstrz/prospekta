@@ -1500,29 +1500,113 @@ export default function TenantSettingsModal({ tenantId, onClose, companyName, on
                       )}
                     </div>
 
-                    <div>
-                      <label style={{ display: 'block', fontSize: '0.825rem', fontWeight: 600, marginBottom: '4px' }}>
-                        Link Jadwal Konsultasi / Meeting Online (Google Calendar / Google Meet)
-                      </label>
-                      <input
-                        type="url"
-                        placeholder="https://calendar.google.com/..."
-                        value={settings.calendly_url || ''}
-                        onChange={(e) => setSettings({ ...settings, calendly_url: e.target.value })}
-                        style={{
-                          width: '100%',
-                          height: '40px',
-                          padding: '0 12px',
-                          borderRadius: '6px',
-                          border: '1px solid var(--border-subtle)',
-                          backgroundColor: 'var(--bg-app)',
-                          color: 'var(--text-main)',
-                          fontSize: '0.85rem',
-                          boxSizing: 'border-box',
-                        }}
-                      />
-                      <span style={{ fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block', marginTop: '4px' }}>
-                        Tautan ini otomatis disisipkan di proposal dan akhir email penawaran sehingga calon klien yang berminat bisa langsung klik untuk memilih jam diskusi.
+                    <div
+                      style={{
+                        padding: '12px',
+                        borderRadius: '8px',
+                        border: '1px solid var(--border-subtle)',
+                        backgroundColor: 'var(--bg-app)',
+                        display: 'flex',
+                        flexDirection: 'column',
+                        gap: '10px',
+                      }}
+                    >
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: '8px' }}>
+                        <label style={{ fontSize: '0.825rem', fontWeight: 700, color: 'var(--text-main)' }}>
+                          Integrasi Google Calendar (Jadwal Meeting)
+                        </label>
+                        <span
+                          style={{
+                            fontSize: '0.7rem',
+                            fontWeight: 600,
+                            padding: '2px 8px',
+                            borderRadius: '9999px',
+                            backgroundColor: settings.calendly_url ? 'var(--success-bg)' : 'var(--bg-card)',
+                            color: settings.calendly_url ? 'var(--success-text)' : 'var(--text-muted)',
+                            border: '1px solid var(--border-subtle)',
+                          }}
+                        >
+                          {settings.calendly_url ? 'Terhubung Link Booking' : 'Mode Redirect Google Calendar'}
+                        </span>
+                      </div>
+
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(210px, 1fr))', gap: '8px' }}>
+                        <button
+                          type="button"
+                          onClick={() => setSettings({ ...settings, calendly_url: '' })}
+                          style={{
+                            textAlign: 'left',
+                            padding: '10px 12px',
+                            borderRadius: '8px',
+                            border: !settings.calendly_url ? '1.5px solid var(--primary)' : '1px solid var(--border-subtle)',
+                            backgroundColor: !settings.calendly_url ? 'rgba(37, 99, 235, 0.08)' : 'var(--bg-card)',
+                            cursor: 'pointer',
+                            color: 'var(--text-main)',
+                          }}
+                        >
+                          <div style={{ fontSize: '0.8rem', fontWeight: 700 }}>Redirect Google Calendar (Tanpa Connect)</div>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                            Langsung mengarahkan tombol jadwal ke Google Calendar resmi (`calendar.google.com`).
+                          </div>
+                        </button>
+
+                        <button
+                          type="button"
+                          onClick={() => {
+                            if (!settings.calendly_url) {
+                              setSettings({ ...settings, calendly_url: 'https://calendar.app.google/' });
+                            }
+                          }}
+                          style={{
+                            textAlign: 'left',
+                            padding: '10px 12px',
+                            borderRadius: '8px',
+                            border: settings.calendly_url ? '1.5px solid var(--primary)' : '1px solid var(--border-subtle)',
+                            backgroundColor: settings.calendly_url ? 'rgba(37, 99, 235, 0.08)' : 'var(--bg-card)',
+                            cursor: 'pointer',
+                            color: 'var(--text-main)',
+                          }}
+                        >
+                          <div style={{ fontSize: '0.8rem', fontWeight: 700 }}>Hubungkan Link Jadwal Google Calendar</div>
+                          <div style={{ fontSize: '0.72rem', color: 'var(--text-muted)', marginTop: '2px' }}>
+                            Tempel tautan Appointment Schedule Google Calendar agar klien pilih jam sendiri.
+                          </div>
+                        </button>
+                      </div>
+
+                      {Boolean(settings.calendly_url) && (
+                        <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap', alignItems: 'center' }}>
+                          <input
+                            type="url"
+                            placeholder="https://calendar.app.google/... atau https://calendar.google.com/calendar/appointments/..."
+                            value={settings.calendly_url || ''}
+                            onChange={(e) => setSettings({ ...settings, calendly_url: e.target.value })}
+                            style={{
+                              flex: '1 1 260px',
+                              minHeight: '40px',
+                              padding: '0 12px',
+                              borderRadius: '6px',
+                              border: '1px solid var(--border-subtle)',
+                              backgroundColor: 'var(--bg-card)',
+                              color: 'var(--text-main)',
+                              fontSize: '0.85rem',
+                              boxSizing: 'border-box',
+                            }}
+                          />
+                          <a
+                            href={settings.calendly_url || 'https://calendar.google.com'}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="btn btn-secondary btn-sm"
+                            style={{ minHeight: '40px', display: 'inline-flex', alignItems: 'center', textDecoration: 'none' }}
+                          >
+                            Buka Link &rarr;
+                          </a>
+                        </div>
+                      )}
+
+                      <span style={{ fontSize: '0.74rem', color: 'var(--text-muted)', lineHeight: 1.45 }}>
+                        Jika terhubung, tautan disisipkan di proposal &amp; opsi email. Jika tidak, tombol jadwal akan otomatis me-redirect ke Google Calendar.
                       </span>
                     </div>
 

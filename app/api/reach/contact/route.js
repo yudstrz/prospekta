@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server';
 import { db, dbWrite, invalidateCache } from '@/lib/db';
-import { lookupApolloPerson } from '@/lib/apollo';
 import { sessionFromRequest } from '@/lib/auth';
 
 const cleanStr = (val, max = 250) => {
@@ -13,7 +12,6 @@ export async function GET(request) {
   try {
     const { searchParams } = new URL(request.url);
     const placeId = searchParams.get('placeId');
-    const lookup = searchParams.get('lookup');
 
     if (!placeId) {
       return NextResponse.json({ success: false, error: 'Parameter placeId diperlukan.' }, { status: 400 });
@@ -28,56 +26,9 @@ export async function GET(request) {
       return NextResponse.json({ success: false, error: 'Data perusahaan tidak ditemukan.' }, { status: 404 });
     }
 
-    const place = placeRes.rows[0];
-
-    // If requesting Apollo lookup explicitly
-    if (lookup === 'apollo') {
-      const apolloRes = await lookupApolloPerson({
-        companyName: place.name,
-        domain: place.website
-      });
-
-      if (apolloRes.success && apolloRes.person) {
-        // Automatically save to database
-        await db.execute({
-          sql: `
-            UPDATE places SET
-              pic_name = COALESCE(?, pic_name),
-              email = COALESCE(?, email),
-              phone = COALESCE(?, phone),
-              linkedin_url = COALESCE(?, linkedin_url)
-            WHERE overture_id = ?;
-          `,
-          args: [
-            apolloRes.person.name,
-            apolloRes.person.email,
-            apolloRes.person.phone,
-            apolloRes.person.linkedin_url,
-            placeId
-          ]
-        });
-
-        return NextResponse.json({
-          success: true,
-          person: apolloRes.person,
-          source: 'apollo_api',
-          message: 'Data PIC berhasil ditemukan dari Apollo.io.'
-        });
-      }
-
-      // If Apollo API returned 403 or error
-      return NextResponse.json({
-        success: false,
-        status: apolloRes.status,
-        error: apolloRes.error || apolloRes.reason || 'PIC tidak ditemukan di Apollo.io.',
-        isFreePlan: apolloRes.status === 403,
-        suggestion: 'Akun Apollo Free membatasi pencarian via backend API. Gunakan tombol Apollo Web / LinkedIn untuk menyalin nama PIC 1-klik.'
-      });
-    }
-
     return NextResponse.json({
       success: true,
-      place
+      place: placeRes.rows[0]
     });
   } catch (err) {
     return NextResponse.json({ success: false, error: err.message }, { status: 500 });
