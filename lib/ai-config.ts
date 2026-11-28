@@ -80,41 +80,41 @@ export function getAiConfig(): {
         id: 'agnes',
         displayName: 'Agnes AI (Bawaan Platform)',
         latestDefault: envStr('AGENT_MODEL_ID') || envStr('GEMINI_MODEL') || 'gemini-flash-latest',
-        pinnedDefault: envStr('AGENT_MODEL_ID') || envStr('GEMINI_MODEL_PINNED') || 'gemini-flash-latest',
+        pinnedDefault: envStr('AGENT_MODEL_ID') || envStr('GEMINI_MODEL_PINNED') || 'gemini-3.8-flash',
         adminModel: envStr('AGENT_ADMIN_MODEL') || undefined,
         userModel: envStr('AGENT_USER_MODEL') || undefined,
-        fallbackModel: envStr('GEMINI_FALLBACK_MODEL') || 'gemini-flash-latest',
+        fallbackModel: envStr('GEMINI_FALLBACK_MODEL') || 'gemini-flash-lite-latest',
         rollingAlias: 'gemini-flash-latest',
       },
       gemini: {
         id: 'gemini',
         displayName: 'Google Gemini',
         latestDefault: envStr('GEMINI_MODEL') || 'gemini-flash-latest',
-        pinnedDefault: envStr('GEMINI_MODEL_PINNED') || envStr('GEMINI_MODEL') || 'gemini-flash-latest',
+        pinnedDefault: envStr('GEMINI_MODEL_PINNED') || envStr('GEMINI_MODEL') || 'gemini-3.8-flash',
         adminModel: envStr('GEMINI_ADMIN_MODEL') || undefined,
         userModel: envStr('GEMINI_USER_MODEL') || undefined,
-        fallbackModel: envStr('GEMINI_FALLBACK_MODEL') || 'gemini-flash-latest',
+        fallbackModel: envStr('GEMINI_FALLBACK_MODEL') || 'gemini-flash-lite-latest',
         rollingAlias: 'gemini-flash-latest',
       },
       openai: {
         id: 'openai',
         displayName: 'OpenAI ChatGPT',
-        latestDefault: envStr('OPENAI_MODEL') || 'chat-latest',
-        pinnedDefault: envStr('OPENAI_MODEL_PINNED') || envStr('OPENAI_MODEL') || 'gpt-4o-mini',
+        latestDefault: envStr('OPENAI_MODEL') || 'auto',
+        pinnedDefault: envStr('OPENAI_MODEL_PINNED') || envStr('OPENAI_MODEL') || 'gpt-6.2-sol',
         adminModel: envStr('OPENAI_ADMIN_MODEL') || undefined,
         userModel: envStr('OPENAI_USER_MODEL') || undefined,
-        fallbackModel: envStr('OPENAI_FALLBACK_MODEL') || 'gpt-4o-mini',
-        rollingAlias: 'gpt-4o-mini',
+        fallbackModel: envStr('OPENAI_FALLBACK_MODEL') || 'gpt-6-luna',
+        rollingAlias: 'gpt-6.2-sol',
       },
       claude: {
         id: 'claude',
         displayName: 'Anthropic Claude',
         latestDefault: envStr('CLAUDE_MODEL') || 'auto',
-        pinnedDefault: envStr('CLAUDE_MODEL_PINNED') || envStr('CLAUDE_MODEL') || 'claude-sonnet-4-0',
+        pinnedDefault: envStr('CLAUDE_MODEL_PINNED') || envStr('CLAUDE_MODEL') || 'claude-sonnet-5-5',
         adminModel: envStr('CLAUDE_ADMIN_MODEL') || undefined,
         userModel: envStr('CLAUDE_USER_MODEL') || undefined,
-        fallbackModel: envStr('CLAUDE_FALLBACK_MODEL') || 'claude-3-5-haiku-latest',
-        rollingAlias: 'claude-sonnet-4-0',
+        fallbackModel: envStr('CLAUDE_FALLBACK_MODEL') || 'claude-haiku-5-5',
+        rollingAlias: 'claude-sonnet-5-5',
         modelLine: (envStr('CLAUDE_MODEL_LINE') || 'sonnet').toLowerCase(),
       },
     },
@@ -167,7 +167,15 @@ export function getFallbackCandidates(
   const cfg = getAiConfig();
   const norm = normalizeProvider(provider) || cfg.defaultProvider;
   const pCfg = cfg.providers[norm];
-  const raw = [pCfg.fallbackModel, pCfg.rollingAlias];
+  const raw = [
+    pCfg.fallbackModel,
+    pCfg.rollingAlias,
+    ...(norm === 'gemini' || norm === 'agnes'
+      ? ['gemini-3.6-flash', 'gemini-flash-lite-latest', 'gemini-3.8-flash']
+      : norm === 'openai'
+        ? ['gpt-5.4-mini', 'gpt-4o-mini']
+        : []),
+  ];
   return Array.from(new Set(raw.filter((m) => m && m !== 'auto' && m !== 'chat-latest' && m !== primaryModel)));
 }
 
@@ -207,14 +215,16 @@ export async function resolveClaudeAutoModel({
     });
     if (res.ok) {
       const payload = (await res.json().catch(() => ({}))) as {
-        data?: Array<{ id?: string; line?: string; display_name?: string; created_at?: string }>;
+        data?: Array<{ id?: string; line?: string; display_name?: string; lifecycle?: string; created_at?: string }>;
       };
       const rows = Array.isArray(payload.data) ? payload.data : [];
-      const lineMatched = rows.filter((m) => {
+      const activeRows = rows.filter((m) => m.lifecycle !== 'retired' && m.lifecycle !== 'deprecated');
+      const source = activeRows.length > 0 ? activeRows : rows;
+      const lineMatched = source.filter((m) => {
         if (m.line && m.line.toLowerCase() === targetLine) return true;
         return `${m.id || ''} ${m.display_name || ''}`.toLowerCase().includes(targetLine);
       });
-      const pool = lineMatched.length > 0 ? lineMatched : rows.filter((m) => /^claude-/i.test(m.id || ''));
+      const pool = lineMatched.length > 0 ? lineMatched : source.filter((m) => /^claude-/i.test(m.id || ''));
       pool.sort((a, b) => Date.parse(b.created_at || '0') - Date.parse(a.created_at || '0'));
       if (pool[0]?.id) picked = pool[0].id;
     }
@@ -228,7 +238,7 @@ export function pickBestGeminiModel(names: string[] = []): string {
   const fallback = getAiConfig().providers.gemini.rollingAlias;
   const cleaned = names.map((n) => String(n || '').replace(/^models\//, '').trim()).filter(Boolean);
 
-  // Prioritaskan versi numerik terbaru (mis. gemini-3.8-flash) di atas versi usang < 3.0
+  // Prioritaskan versi numerik aktif terbaru (mis. gemini-3.8-flash) di atas model deprecated (< 3.0)
   const numericFlash = cleaned
     .map((id) => {
       const m = id.match(/^gemini-(\d+(?:\.\d+)?)-flash$/);
@@ -245,24 +255,42 @@ export function pickBestGeminiModel(names: string[] = []): string {
       const m = id.match(/^gemini-(\d+(?:\.\d+)?)-flash/);
       return m ? { id, ver: parseFloat(m[1]) } : null;
     })
-    .filter((item): item is { id: string; ver: number } => Boolean(item) && item!.ver >= 2.5)
+    .filter((item): item is { id: string; ver: number } => Boolean(item) && item!.ver >= 3.0)
     .sort((a, b) => b.ver - a.ver);
 
-  return anyFlash[0]?.id || fallback;
+  if (anyFlash.length > 0) return anyFlash[0].id;
+  if (cleaned.includes('gemini-flash-lite-latest')) return 'gemini-flash-lite-latest';
+  return fallback;
 }
+
+const OPENAI_TIER_RANK: Record<string, number> = {
+  sol: 5,
+  '': 4,
+  astra: 3,
+  terra: 2,
+  mini: 1,
+  luna: 0,
+};
 
 export function pickBestOpenAiModel(models: Array<{ id?: string } | string> = []): string {
   const fallback = getAiConfig().providers.openai.fallbackModel;
   const ids = (Array.isArray(models) ? models : []).map((m) => (typeof m === 'string' ? m : m?.id)).filter(Boolean) as string[];
   const scored = ids
     .map((id) => {
-      if (id === 'gpt-4o' || id === 'gpt-4o-mini') return { id, ver: 4.05, mini: id.endsWith('-mini') ? 1 : 0 };
-      const m = id.match(/^gpt-(\d+(?:\.\d+)?)(-mini)?$/);
+      if (/(realtime|audio|transcribe|tts|image|search|codex|healthcare|deep-research|-pro\b|-chat-latest|^chatgpt-|-\d{4}-\d{2}-\d{2}$)/i.test(id)) {
+        return null;
+      }
+      if (id === 'gpt-4o' || id === 'gpt-4o-mini') {
+        return { id, ver: 4.05, rank: id.endsWith('-mini') ? 1 : 4 };
+      }
+      const m = id.match(/^gpt-(\d+(?:\.\d+)?)(?:-([a-z]+))?$/i);
       if (!m) return null;
-      return { id, ver: parseFloat(m[1]), mini: m[2] ? 1 : 0 };
+      const tier = (m[2] || '').toLowerCase();
+      if (!(tier in OPENAI_TIER_RANK)) return null;
+      return { id, ver: parseFloat(m[1]), rank: OPENAI_TIER_RANK[tier] };
     })
-    .filter(Boolean)
-    .sort((a, b) => (b!.ver !== a!.ver ? b!.ver - a!.ver : a!.mini - b!.mini));
+    .filter((x): x is { id: string; ver: number; rank: number } => Boolean(x))
+    .sort((a, b) => (b.ver !== a.ver ? b.ver - a.ver : b.rank - a.rank));
   return scored[0]?.id || fallback;
 }
 
@@ -339,12 +367,12 @@ export async function resolveRuntimeModel({
 }
 
 /**
- * Hilangkan parameter temperature pada model OpenAI generasi baru (gpt-5, o1, o3, o4)
+ * Hilangkan parameter temperature pada model OpenAI generasi baru (gpt-5, gpt-6+, o1..o9, computer-use)
  * yang hanya menerima nilai default (1).
  */
 export function supportsCustomTemperature(provider: AiProvider | string, model: string): boolean {
   if (normalizeProvider(provider) !== 'openai') return true;
-  return !/^(gpt-5|o1|o3|o4|computer-use)/i.test(String(model || '').trim());
+  return !/^(gpt-[5-9]|gpt-\d{2}|o[1-9]|computer-use)/i.test(String(model || '').trim());
 }
 
 export function buildOpenAiChatBody<T extends Record<string, unknown>>(
@@ -402,11 +430,12 @@ export async function fetchOpenAiChatSafe({
 }
 
 export function isRecoverableModelError(err: unknown): boolean {
-  const anyErr = err as { status?: number; code?: number; message?: string };
+  const anyErr = err as { status?: number; code?: number; name?: string; message?: string };
+  if (anyErr?.name === 'AbortError' || anyErr?.name === 'TimeoutError') return true;
   const status = Number(anyErr?.status || anyErr?.code || 0);
   if (status === 404 || status === 410 || status === 429 || status === 503) return true;
   const msg = String(anyErr?.message || err || '');
-  return /404|NOT_FOUND|not found|no longer available|deprecated|decommissioned|does not exist|model_not_found|rate limit|quota|resource_exhausted|429/i.test(msg);
+  return /404|503|NOT_FOUND|UNAVAILABLE|not found|no longer available|deprecated|decommissioned|does not exist|model_not_found|rate limit|quota|resource_exhausted|429|high demand|overloaded|temporarily unavailable|timed out|timeout|aborted/i.test(msg);
 }
 
 export function logResolvedModelUsage(entry: ModelUsageLog): void {
