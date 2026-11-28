@@ -7,32 +7,56 @@ export const dynamic = 'force-dynamic';
 
 const fail = (error, status = 500) => NextResponse.json({ success: false, error }, { status });
 
+function getAnchorScope(session) {
+  const tid = session?.tid || null;
+  const isSuperAdmin = session?.role === 'admin' || !tid || tid === 'tnt_master';
+  return {
+    tid,
+    isSuperAdmin,
+    effectiveTid: isSuperAdmin ? 'tnt_master' : tid,
+    whereClause: isSuperAdmin ? "(tenant_id = 'tnt_master' OR tenant_id IS NULL)" : 'tenant_id = ?',
+    whereArgs: isSuperAdmin ? [] : [tid],
+  };
+}
+
+function parseAnchorPayload(body, isSuperAdmin) {
+  const name = String(body.name || '').trim();
+  const city = String(body.city || 'Kustom').trim() || 'Kustom';
+  const lat = parseFloat(body.lat);
+  const lng = parseFloat(body.lng);
+
+  if (!name) return { error: 'Nama titik wajib diisi.' };
+  if (Number.isNaN(lat) || lat < -90 || lat > 90) return { error: 'Latitude tidak valid (-90 sampai 90).' };
+  if (Number.isNaN(lng) || lng < -180 || lng > 180) return { error: 'Longitude tidak valid (-180 sampai 180).' };
+
+  const isSg = city.toLowerCase().includes('singapore') || name.toLowerCase().includes('singapore');
+  const maxRadius = isSg && isSuperAdmin ? 20 : 10;
+  const radiusKm = Math.min(Math.max(parseFloat(body.radius_default_km || 2) || 2, 0.5), maxRadius);
+  const address = String(body.address || `Koordinat (${lat.toFixed(4)}, ${lng.toFixed(4)})`).trim();
+
+  return { name, city, lat, lng, radiusKm, address };
+}
+
 export async function GET(request) {
   try {
     await ensureTenantSchema();
     const session = await sessionFromRequest(request);
-    const tid = session?.tid || null;
-    const isSuperAdmin = session?.role === 'admin' || !tid || tid === 'tnt_master';
+    if (!session) return fail('Unauthorized', 401);
+    const { tid, isSuperAdmin, whereClause, whereArgs } = getAnchorScope(session);
 
-    let sql;
-    let args;
-    if (isSuperAdmin) {
-      sql = `SELECT id, name, address, city, lat, lng, radius_default_km
-             FROM anchors
-             WHERE tenant_id = 'tnt_master' OR tenant_id IS NULL
-             ORDER BY
-               CASE WHEN id IN ('prospekta_jkt', 'ai_hub', 'academy_jakarta', 'academy_surabaya', 'prospekta_sg') THEN 0 ELSE 1 END,
-               id ASC;`;
-      args = [];
-    } else {
-      sql = `SELECT id, name, address, city, lat, lng, radius_default_km
-             FROM anchors
-             WHERE tenant_id = ?
-             ORDER BY id ASC;`;
-      args = [tid];
-    }
+    const sql = isSuperAdmin
+      ? `SELECT id, name, address, city, lat, lng, radius_default_km
+         FROM anchors
+         WHERE ${whereClause}
+         ORDER BY
+           CASE WHEN id IN ('prospekta_jkt', 'ai_hub', 'academy_jakarta', 'academy_surabaya', 'prospekta_sg') THEN 0 ELSE 1 END,
+           id ASC;`
+      : `SELECT id, name, address, city, lat, lng, radius_default_km
+         FROM anchors
+         WHERE ${whereClause}
+         ORDER BY id ASC;`;
 
-    const anchorsRes = await cachedExecute({ sql, args }, 30000);
+    const anchorsRes = await cachedExecute({ sql, args: whereArgs }, 30000);
     let rows = anchorsRes?.rows || [];
 
     // Auto-heal: jika klien belum punya anchor di database tetapi punya profil alamat di tabel tenants, buatkan otomatis
@@ -56,7 +80,7 @@ export async function GET(request) {
           });
           invalidateCache();
           const fresh = await db.execute({
-            sql: `SELECT id, name, address, city, lat, lng, radius_default_km FROM anchors WHERE tenant_id = ?;`,
+            sql: `SELECT id, name, address, city, lat, lng, radius_default_km FROM anchors WHERE tenant_id = ? ORDER BY id ASC;`,
             args: [tid]
           });
           rows = fresh.rows || [];
@@ -80,43 +104,38 @@ export async function POST(request) {
   try {
     await ensureTenantSchema();
     const session = await sessionFromRequest(request);
-    const tid = session?.tid || null;
-    const isSuperAdmin = session?.role === 'admin' || !tid || tid === 'tnt_master';
+    if (!session) return fail('Unauthorized', 401);
+    const { isSuperAdmin, effectiveTid, whereClause, whereArgs } = getAnchorScope(session);
+
     const body = await request.json().catch(() => ({}));
-    const name = (body.name || '').trim();
-    const city = (body.city || 'Kustom').trim();
-    const lat = parseFloat(body.lat);
-    const lng = parseFloat(body.lng);
-    const isSg = city.toLowerCase().includes('singapore') || name.toLowerCase().includes('singapore');
-    const maxRadius = isSg && isSuperAdmin ? 20 : 10;
-    const radiusKm = Math.min(Math.max(parseFloat(body.radius_default_km || 2), 0.5), maxRadius);
-    const address = (body.address || `Koordinat (${lat.toFixed(4)}, ${lng.toFixed(4)})`).trim();
+    const parsed = parseAnchorPayload(body, isSuperAdmin);
+    if (parsed.error) return fail(parsed.error, 400);
 
-    if (!name) return fail('Nama titik wajib diisi.', 400);
-    if (isNaN(lat) || lat < -90 || lat > 90) return fail('Latitude tidak valid (-90 sampai 90).', 400);
-    if (isNaN(lng) || lng < -180 || lng > 180) return fail('Longitude tidak valid (-180 sampai 180).', 400);
-
-    // Cek duplikasi nama titik: hanya dilarang jika nama yang sama sudah ada di akun/tenant yang sama.
-    // Akun berbeda DIPERBOLEHKAN menggunakan nama atau lokasi yang sama.
-    const effectiveTid = tid || 'tnt_master';
-    const dupSql = isSuperAdmin
-      ? `SELECT 1 FROM anchors WHERE LOWER(name) = LOWER(?) AND (tenant_id = 'tnt_master' OR tenant_id IS NULL) LIMIT 1;`
-      : `SELECT 1 FROM anchors WHERE LOWER(name) = LOWER(?) AND tenant_id = ? LIMIT 1;`;
-    const dupArgs = isSuperAdmin ? [name] : [name, effectiveTid];
-    const dup = await db.execute({ sql: dupSql, args: dupArgs });
+    const dup = await db.execute({
+      sql: `SELECT 1 FROM anchors WHERE LOWER(name) = LOWER(?) AND ${whereClause} LIMIT 1;`,
+      args: [parsed.name, ...whereArgs],
+    });
     if (dup.rows?.length) return fail('Nama titik sudah ada di akun ini. Gunakan nama lain.', 409);
 
     const id = `custom_${Date.now()}`;
     await db.execute({
       sql: `INSERT INTO anchors (id, name, address, city, lat, lng, radius_default_km, tenant_id)
             VALUES (?, ?, ?, ?, ?, ?, ?, ?);`,
-      args: [id, name, address, city, lat, lng, radiusKm, effectiveTid],
+      args: [id, parsed.name, parsed.address, parsed.city, parsed.lat, parsed.lng, parsed.radiusKm, effectiveTid],
     });
     invalidateCache();
 
     return NextResponse.json({
       success: true,
-      anchor: { id, name, address, city, lat, lng, radius_default_km: radiusKm },
+      anchor: {
+        id,
+        name: parsed.name,
+        address: parsed.address,
+        city: parsed.city,
+        lat: parsed.lat,
+        lng: parsed.lng,
+        radius_default_km: parsed.radiusKm,
+      },
     });
   } catch (error) {
     console.error('Error creating anchor:', error);
@@ -124,38 +143,104 @@ export async function POST(request) {
   }
 }
 
+export async function PATCH(request) {
+  try {
+    await ensureTenantSchema();
+    const session = await sessionFromRequest(request);
+    if (!session) return fail('Unauthorized', 401);
+    const { isSuperAdmin, whereClause, whereArgs } = getAnchorScope(session);
+
+    const body = await request.json().catch(() => ({}));
+    const id = String(body.id || new URL(request.url).searchParams.get('id') || '').trim();
+    if (!id) return fail('ID lokasi wajib disertakan.', 400);
+
+    const existingRes = await db.execute({
+      sql: `SELECT id, name FROM anchors WHERE id = ? AND ${whereClause} LIMIT 1;`,
+      args: [id, ...whereArgs],
+    });
+    const existing = existingRes.rows?.[0];
+    if (!existing) return fail('Lokasi kantor tidak ditemukan.', 404);
+
+    const parsed = parseAnchorPayload(body, isSuperAdmin);
+    if (parsed.error) return fail(parsed.error, 400);
+
+    const dup = await db.execute({
+      sql: `SELECT 1 FROM anchors WHERE LOWER(name) = LOWER(?) AND id != ? AND ${whereClause} LIMIT 1;`,
+      args: [parsed.name, id, ...whereArgs],
+    });
+    if (dup.rows?.length) return fail('Nama lokasi sudah dipakai titik lain di akun ini.', 409);
+
+    const stmts = [
+      {
+        sql: `UPDATE anchors SET name = ?, address = ?, city = ?, lat = ?, lng = ?, radius_default_km = ? WHERE id = ?;`,
+        args: [parsed.name, parsed.address, parsed.city, parsed.lat, parsed.lng, parsed.radiusKm, id],
+      },
+    ];
+
+    if (existing.name !== parsed.name) {
+      stmts.push(
+        {
+          sql: `UPDATE places SET anchor = ? WHERE anchor = ? AND ${whereClause};`,
+          args: [parsed.name, existing.name, ...whereArgs],
+        },
+        {
+          sql: `UPDATE scans SET anchor = ? WHERE anchor = ? AND ${whereClause};`,
+          args: [parsed.name, existing.name, ...whereArgs],
+        }
+      );
+    }
+
+    await db.batch(stmts);
+    invalidateCache();
+
+    return NextResponse.json({
+      success: true,
+      anchor: {
+        id,
+        name: parsed.name,
+        address: parsed.address,
+        city: parsed.city,
+        lat: parsed.lat,
+        lng: parsed.lng,
+        radius_default_km: parsed.radiusKm,
+      },
+    });
+  } catch (error) {
+    console.error('Error updating anchor:', error);
+    return fail(error.message);
+  }
+}
+
+export const PUT = PATCH;
+
 export async function DELETE(request) {
   try {
     await ensureTenantSchema();
     const session = await sessionFromRequest(request);
-    const tid = session?.tid || null;
-    const isSuperAdmin = session?.role === 'admin' || !tid || tid === 'tnt_master';
+    if (!session) return fail('Unauthorized', 401);
+    const { whereClause, whereArgs } = getAnchorScope(session);
     const id = new URL(request.url).searchParams.get('id');
+    if (!id) return fail('ID lokasi wajib diisi.', 400);
 
-    if (!id || !id.startsWith('custom_')) {
-      return fail('Hanya titik kustom yang dapat dihapus. Titik kantor default dilindungi.', 400);
-    }
-
-    const checkSql = isSuperAdmin
-      ? `SELECT name FROM anchors WHERE id = ? AND (tenant_id = 'tnt_master' OR tenant_id IS NULL) LIMIT 1;`
-      : `SELECT name FROM anchors WHERE id = ? AND tenant_id = ? LIMIT 1;`;
-    const checkArgs = isSuperAdmin ? [id] : [id, tid];
-    const checkRes = await db.execute({ sql: checkSql, args: checkArgs });
+    const checkRes = await db.execute({
+      sql: `SELECT id, name FROM anchors WHERE id = ? AND ${whereClause} LIMIT 1;`,
+      args: [id, ...whereArgs],
+    });
     if (!checkRes.rows?.length) return fail('Titik tidak ditemukan.', 404);
 
-    const anchorName = checkRes.rows[0].name;
-    const deletePlacesSql = isSuperAdmin
-      ? `DELETE FROM places WHERE anchor = ? AND (tenant_id = 'tnt_master' OR tenant_id IS NULL);`
-      : `DELETE FROM places WHERE anchor = ? AND tenant_id = ?;`;
-    const deleteScansSql = isSuperAdmin
-      ? `DELETE FROM scans WHERE anchor = ? AND (tenant_id = 'tnt_master' OR tenant_id IS NULL);`
-      : `DELETE FROM scans WHERE anchor = ? AND tenant_id = ?;`;
-    const deleteArgs = isSuperAdmin ? [anchorName] : [anchorName, tid];
+    const countRes = await db.execute({
+      sql: `SELECT COUNT(*) as count FROM anchors WHERE ${whereClause};`,
+      args: whereArgs,
+    });
+    if (Number(countRes.rows?.[0]?.count || 0) <= 1) {
+      return fail('Minimal harus ada 1 lokasi kantor aktif. Edit lokasi ini atau tambah lokasi baru sebelum menghapus.', 400);
+    }
 
+    const anchorName = checkRes.rows[0].name;
     await db.batch([
       { sql: 'DELETE FROM anchors WHERE id = ?;', args: [id] },
-      { sql: deletePlacesSql, args: deleteArgs },
-      { sql: deleteScansSql, args: deleteArgs },
+      { sql: `DELETE FROM places WHERE anchor = ? AND ${whereClause};`, args: [anchorName, ...whereArgs] },
+      { sql: `DELETE FROM scans WHERE anchor = ? AND ${whereClause};`, args: [anchorName, ...whereArgs] },
     ]);
     invalidateCache();
 

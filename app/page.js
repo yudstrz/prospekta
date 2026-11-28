@@ -396,16 +396,9 @@ export default function DashboardPage() {
   // Derive active anchor safely
   const activeAnchor = anchors.find((a) => a.id === activeAnchorId) || anchors[0] || null;
   const isSuperadmin = Boolean(currentSession?.isSuperadmin);
-  const officeAnchors = isSuperadmin
-    ? anchors.filter((a) => !a.id.startsWith('custom_'))
-    : anchors.filter((a) => a.id.startsWith('custom_tnt_') || !a.id.startsWith('custom_'));
-  const customAnchors = isSuperadmin
-    ? anchors.filter((a) => a.id.startsWith('custom_'))
-    : anchors.filter((a) => a.id.startsWith('custom_') && !a.id.startsWith('custom_tnt_'));
 
   const isSingaporeAnchor = Boolean(
     activeAnchor?.city?.toLowerCase()?.includes('singapore') ||
-    activeAnchor?.id === 'prospekta_jkt' ||
     activeAnchor?.name?.toLowerCase()?.includes('sg') ||
     activeAnchor?.name?.toLowerCase()?.includes('singapore')
   );
@@ -417,7 +410,6 @@ export default function DashboardPage() {
     if (!activeAnchor) return;
     const isSg = Boolean(
       activeAnchor?.city?.toLowerCase()?.includes('singapore') ||
-      activeAnchor?.id === 'prospekta_jkt' ||
       activeAnchor?.name?.toLowerCase()?.includes('sg') ||
       activeAnchor?.name?.toLowerCase()?.includes('singapore')
     );
@@ -738,11 +730,11 @@ export default function DashboardPage() {
           ...prev,
           lat,
           lng,
-          name: data.place.name || prev?.name || 'Titik Terpilih',
+          name: prev?.id ? prev.name : (data.place.name || prev?.name || 'Titik Terpilih'),
           city: data.place.city || prev?.city || 'Kota',
           address: data.place.address || ''
         }));
-        setCustomStatusMsg(`Lokasi terdeteksi: ${data.place.name} (${data.place.city}). Sesuaikan radius atau simpan.`);
+        setCustomStatusMsg(`Lokasi terdeteksi: ${data.place.name} (${data.place.city}). Sesuaikan detail atau simpan.`);
       }
     } catch (err) {
       if (err.name !== 'AbortError') {
@@ -787,17 +779,17 @@ export default function DashboardPage() {
       ...prev,
       lat: item.lat,
       lng: item.lng,
-      name: item.name,
+      name: prev?.id ? prev.name : item.name,
       city: item.city,
       address: item.address,
       radiusKm: prev?.radiusKm || 2
     }));
     setGeoSearchQuery(item.name);
     setGeoSearchOpen(false);
-    setCustomStatusMsg(`Lokasi terpilih: ${item.name} (${item.city}). Radius siap dipindai.`);
+    setCustomStatusMsg(`Lokasi terpilih: ${item.name} (${item.city}). Siap disimpan.`);
   };
 
-  // Toggle Custom Point Picking Mode on the Map
+  // Toggle Create / Edit Location Picking Mode on the Map
   const handleTogglePickingMode = () => {
     if (isPickingMode) {
       setIsPickingMode(false);
@@ -808,21 +800,41 @@ export default function DashboardPage() {
       setGeoSearchOpen(false);
     } else {
       setIsPickingMode(true);
-      const baseLat = activeAnchor ? Number(activeAnchor.lat) : 1.3385;
-      const baseLng = activeAnchor ? Number(activeAnchor.lng) : 103.7559;
+      const baseLat = activeAnchor ? Number(activeAnchor.lat) : -6.2256;
+      const baseLng = activeAnchor ? Number(activeAnchor.lng) : 106.8041;
       const customCount = anchors.filter((a) => a.id.startsWith('custom_')).length + 1;
       setCustomCandidate({
         lat: baseLat,
         lng: baseLng,
         name: `Titik Kustom ${customCount}`,
-        city: activeAnchor?.city || 'Singapore',
+        city: activeAnchor?.city || 'Jakarta',
         address: '',
         radiusKm: 2
       });
       setCustomStatusMsg('Ketik nama lokasi di bawah, klik sembarang titik di peta, atau geser pin.');
-      // Auto reverse-geocode initial position
       performReverseGeocode(baseLat, baseLng);
     }
+  };
+
+  const handleStartEditAnchor = (anchorToEdit) => {
+    if (!anchorToEdit) return;
+    setActiveAnchorId(anchorToEdit.id);
+    setRadiusKm(Number(anchorToEdit.radius_default_km) || 2);
+    setIsPickingMode(true);
+    setGeoSearchQuery('');
+    setGeoSearchResults([]);
+    setGeoSearchOpen(false);
+    setCustomCandidate({
+      id: anchorToEdit.id,
+      originalName: anchorToEdit.name,
+      lat: Number(anchorToEdit.lat) || -6.2256,
+      lng: Number(anchorToEdit.lng) || 106.8041,
+      name: anchorToEdit.name || '',
+      city: anchorToEdit.city || '',
+      address: anchorToEdit.address || '',
+      radiusKm: Number(anchorToEdit.radius_default_km) || 2
+    });
+    setCustomStatusMsg(`Mengedit "${anchorToEdit.name}". Ubah form di bawah atau geser pin oranye di peta.`);
   };
 
   const handleMapClick = ({ lat, lng }) => {
@@ -845,50 +857,52 @@ export default function DashboardPage() {
 
   const handleSaveAndScanCustomPoint = async (shouldScan = true) => {
     if (!customCandidate || !customCandidate.name.trim()) {
-      alert('Mohon isi nama titik kustom terlebih dahulu.');
+      alert('Mohon isi nama lokasi kantor terlebih dahulu.');
       return;
     }
 
+    const isEdit = Boolean(customCandidate.id);
     setIsSavingCustomPoint(true);
-    setCustomStatusMsg('Menyimpan titik lokasi ke sistem...');
+    setCustomStatusMsg(isEdit ? 'Menyimpan perubahan lokasi kantor...' : 'Menyimpan titik lokasi ke sistem...');
 
     try {
-      // 1. Save Anchor to DB
-      const createRes = await fetch('/api/anchors', {
-        method: 'POST',
+      // 1. Create or Update Anchor in DB
+      const saveRes = await fetch('/api/anchors', {
+        method: isEdit ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          ...(isEdit ? { id: customCandidate.id } : {}),
           name: customCandidate.name.trim(),
-          address: customCandidate.address.trim() || `Koordinat (${customCandidate.lat.toFixed(4)}, ${customCandidate.lng.toFixed(4)})`,
-          city: customCandidate.city.trim() || 'Kustom',
+          address: (customCandidate.address || '').trim() || `Koordinat (${Number(customCandidate.lat).toFixed(4)}, ${Number(customCandidate.lng).toFixed(4)})`,
+          city: (customCandidate.city || '').trim() || 'Kustom',
           lat: customCandidate.lat,
           lng: customCandidate.lng,
           radius_default_km: customCandidate.radiusKm || 2
         })
       });
 
-      const createData = await createRes.json();
-      if (!createData.success) {
-        throw new Error(createData.error || 'Gagal menyimpan titik.');
+      const saveData = await saveRes.json();
+      if (!saveData.success) {
+        throw new Error(saveData.error || 'Gagal menyimpan lokasi.');
       }
 
-      const newAnchor = createData.anchor;
+      const savedAnchor = saveData.anchor;
 
-      // 2. Refresh anchors and switch to new anchor
+      // 2. Refresh anchors and switch to saved anchor
       await fetchAnchors();
-      setActiveAnchorId(newAnchor.id);
-      setRadiusKm(Number(newAnchor.radius_default_km) || 2);
+      setActiveAnchorId(savedAnchor.id);
+      setRadiusKm(Number(savedAnchor.radius_default_km) || 2);
       setPage(1);
 
       // 3. Scan Places if requested
       if (shouldScan) {
-        setCustomStatusMsg(`Sedang memindai tempat bisnis dalam radius ${newAnchor.radius_default_km} km...`);
+        setCustomStatusMsg(`Sedang memindai tempat bisnis dalam radius ${savedAnchor.radius_default_km} km...`);
         const scanRes = await fetch('/api/scan', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
-            anchor: newAnchor.name,
-            radius_km: Number(newAnchor.radius_default_km) || 2
+            anchor: savedAnchor.name,
+            radius_km: Number(savedAnchor.radius_default_km) || 2
           })
         });
         const scanData = await scanRes.json();
@@ -904,7 +918,7 @@ export default function DashboardPage() {
       setCustomStatusMsg(null);
       handleRefresh();
     } catch (err) {
-      console.error('Custom point save/scan error:', err);
+      console.error('Office location save/scan error:', err);
       alert(`Terjadi kesalahan: ${err.message}`);
       setCustomStatusMsg(`Gagal: ${err.message}`);
     } finally {
@@ -913,13 +927,13 @@ export default function DashboardPage() {
   };
 
   const handleDeleteAnchor = async (anchorToDelete) => {
-    if (!anchorToDelete.id.startsWith('custom_')) {
-      alert('Titik kantor default tidak dapat dihapus.');
+    if (anchors.length <= 1) {
+      alert('Minimal harus ada 1 lokasi kantor aktif. Edit lokasi ini atau tambah lokasi baru sebelum menghapus.');
       return;
     }
 
     const confirmed = window.confirm(
-      `Hapus titik "${anchorToDelete.name}" beserta seluruh data tempat dan riwayat pemindaiannya?`
+      `Hapus lokasi "${anchorToDelete.name}" beserta seluruh data tempat dan riwayat pemindaiannya?`
     );
     if (!confirmed) return;
 
@@ -929,10 +943,16 @@ export default function DashboardPage() {
       });
       const data = await res.json();
       if (!data.success) {
-        throw new Error(data.error || 'Gagal menghapus titik.');
+        throw new Error(data.error || 'Gagal menghapus lokasi.');
       }
 
-      // If active anchor was deleted, switch back to the first default anchor
+      if (customCandidate?.id === anchorToDelete.id) {
+        setIsPickingMode(false);
+        setCustomCandidate(null);
+        setCustomStatusMsg(null);
+      }
+
+      // If active anchor was deleted, switch to another remaining anchor
       if (activeAnchorId === anchorToDelete.id) {
         const fallback = anchors.find((a) => a.id !== anchorToDelete.id) || (currentSession?.isSuperadmin ? DEFAULT_ANCHORS[0] : null);
         if (fallback) {
@@ -946,7 +966,7 @@ export default function DashboardPage() {
       handleRefresh();
     } catch (err) {
       console.error('Delete anchor error:', err);
-      alert(`Gagal menghapus titik: ${err.message}`);
+      alert(`Gagal menghapus lokasi: ${err.message}`);
     }
   };
 
@@ -1449,59 +1469,52 @@ export default function DashboardPage() {
           </div>
 
           <div className="prospekta-anchor-scroll" role="tablist" style={{ display: 'flex', alignItems: 'center', gap: '0.5rem', flexWrap: 'wrap' }}>
-            {officeAnchors.map((a) => (
-              <button
+            {anchors.map((a) => (
+              <div
                 key={a.id}
-                type="button"
-                role="tab"
-                aria-selected={activeAnchorId === a.id}
-                className={`tab-btn ${activeAnchorId === a.id ? 'active' : ''}`}
-                onClick={() => {
-                  setActiveAnchorId(a.id);
-                  setRadiusKm(Number(a.radius_default_km) || 2);
-                  setPage(1);
-                }}
-                style={{ minHeight: '36px', padding: '0 12px', fontSize: '0.8125rem' }}
+                className={`tab-chip ${activeAnchorId === a.id ? 'active' : ''}`}
               >
-                {a.name} ({a.city})
-              </button>
-            ))}
-            {customAnchors.map((a) => (
-              <button
-                key={a.id}
-                type="button"
-                role="tab"
-                aria-selected={activeAnchorId === a.id}
-                className={`tab-btn ${activeAnchorId === a.id ? 'active' : ''}`}
-                onClick={() => {
-                  setActiveAnchorId(a.id);
-                  setRadiusKm(Number(a.radius_default_km) || 2);
-                  setPage(1);
-                }}
-                style={{ display: 'inline-flex', alignItems: 'center', gap: '0.375rem', minHeight: '36px', padding: '0 10px', fontSize: '0.8125rem' }}
-              >
-                <span>{a.name} ({a.city})</span>
-                <span
-                  role="button"
-                  tabIndex={0}
-                  className="btn-tab-delete"
-                  title={tx('Delete this custom point', 'Hapus titik kustom ini')}
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDeleteAnchor(a);
+                <button
+                  type="button"
+                  role="tab"
+                  aria-selected={activeAnchorId === a.id}
+                  className="tab-chip-main"
+                  onClick={() => {
+                    setActiveAnchorId(a.id);
+                    setRadiusKm(Number(a.radius_default_km) || 2);
+                    setPage(1);
                   }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' || e.key === ' ') {
-                      e.stopPropagation();
-                      handleDeleteAnchor(a);
-                    }
-                  }}
-                  aria-label={`${tx('Delete point', 'Hapus titik')} ${a.name}`}
-                  style={{ display: 'inline-flex', alignItems: 'center', justifyContent: 'center' }}
                 >
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
-                </span>
-              </button>
+                  {a.name} ({a.city})
+                </button>
+                <button
+                  type="button"
+                  className="btn-tab-action"
+                  title={tx('Edit location', 'Edit lokasi')}
+                  onClick={() => handleStartEditAnchor(a)}
+                  aria-label={`${tx('Edit location', 'Edit lokasi')} ${a.name}`}
+                >
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M12 20h9" />
+                    <path d="M16.5 3.5a2.121 2.121 0 1 1 3 3L7 19l-4 1 1-4Z" />
+                  </svg>
+                </button>
+                <button
+                  type="button"
+                  className="btn-tab-action btn-tab-delete"
+                  disabled={anchors.length <= 1}
+                  title={anchors.length <= 1
+                    ? tx('At least 1 active location is required', 'Minimal harus ada 1 lokasi kantor aktif')
+                    : tx('Delete location', 'Hapus lokasi ini')}
+                  onClick={() => handleDeleteAnchor(a)}
+                  aria-label={`${tx('Delete location', 'Hapus lokasi')} ${a.name}`}
+                >
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                </button>
+              </div>
             ))}
 
             <button
@@ -1517,14 +1530,14 @@ export default function DashboardPage() {
                 borderColor: isPickingMode ? 'var(--primary)' : 'var(--border-subtle)',
                 whiteSpace: 'nowrap'
               }}
-              title={tx('Pick custom location on map', 'Pilih titik kustom baru di peta')}
+              title={tx('Add new office location on map', 'Tambah lokasi kantor baru di peta')}
             >
               {isPickingMode ? (
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
               ) : (
                 <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
               )}
-              <span>{isPickingMode ? tx('Batal Titik', 'Batal Titik') : tx('Titik Kustom', 'Titik Kustom')}</span>
+              <span>{isPickingMode ? tx('Cancel', 'Batal') : tx('Add Location', 'Tambah Lokasi')}</span>
             </button>
           </div>
         </div>
@@ -1695,7 +1708,9 @@ export default function DashboardPage() {
                   <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0Z"/><circle cx="12" cy="10" r="3"/></svg>
                 </span>
                 <strong style={{ fontSize: '1.0625rem', color: '#ea580c' }}>
-                  Mode Buat Titik Baru & Pindai Radius
+                  {customCandidate?.id
+                    ? tx(`Edit Office Location: ${customCandidate.originalName || customCandidate.name}`, `Edit Lokasi Kantor: ${customCandidate.originalName || customCandidate.name}`)
+                    : tx('Create New Office Location & Scan Radius', 'Mode Buat Lokasi Baru & Pindai Radius')}
                 </strong>
                 {isReverseGeocoding && (
                   <span style={{ display: 'inline-flex', alignItems: 'center', gap: '4px', fontSize: '0.6875rem', color: '#ea580c', background: '#fff7ed', padding: '2px 6px', borderRadius: '4px', border: '1px solid #fdba74' }}>
@@ -1786,17 +1801,17 @@ export default function DashboardPage() {
                 )}
               </div>
 
-              {/* Row 2: Coordinate & Address Details (4 Columns) */}
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '0.75rem' }}>
+              {/* Row 2: Coordinate & Address Details */}
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(190px, 1fr))', gap: '0.75rem' }}>
                 <div>
                   <label className="control-label" style={{ display: 'block', marginBottom: '0.25rem' }}>
-                    Nama Titik / Wilayah:
+                    Nama Titik / Kantor:
                   </label>
                   <input
                     type="text"
                     className="input-text"
                     style={{ width: '100%' }}
-                    placeholder="Contoh: Kawasan SCBD, Grand Indonesia"
+                    placeholder="Contoh: Kawasan SCBD, Headquarters Jakarta"
                     value={customCandidate.name}
                     onChange={(e) => setCustomCandidate({ ...customCandidate, name: e.target.value })}
                     disabled={isSavingCustomPoint}
@@ -1849,21 +1864,39 @@ export default function DashboardPage() {
                 </div>
               </div>
 
+              <div>
+                <label className="control-label" style={{ display: 'block', marginBottom: '0.25rem' }}>
+                  Alamat Lengkap:
+                </label>
+                <input
+                  type="text"
+                  className="input-text"
+                  style={{ width: '100%' }}
+                  placeholder="Contoh: Jl. Jend. Sudirman Kav. 52-53, Senayan"
+                  value={customCandidate.address || ''}
+                  onChange={(e) => setCustomCandidate({ ...customCandidate, address: e.target.value })}
+                  disabled={isSavingCustomPoint}
+                />
+              </div>
+
               {/* Row 3: Radius Selector & Center Info Pill */}
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: '0.75rem' }}>
                 <div>
                   <label className="control-label" style={{ display: 'block', marginBottom: '0.375rem' }}>
-                    Radius Pindai di Peta:
+                    Radius Default Lokasi:
                   </label>
                   <div className="radius-pills">
-                    {[1, 2, 5, 10].map((r) => (
+                    {(isSuperadmin && ((customCandidate.city || '').toLowerCase().includes('singapore') || (customCandidate.name || '').toLowerCase().includes('singapore'))
+                      ? [1, 2, 5, 10, 15, 20]
+                      : [1, 2, 5, 10]
+                    ).map((r) => (
                       <button
                         key={r}
                         type="button"
                         className={`pill-btn ${customCandidate.radiusKm === r ? 'active' : ''}`}
                         onClick={() => setCustomCandidate({ ...customCandidate, radiusKm: r })}
                         disabled={isSavingCustomPoint}
-                        title={tx(`Radius ${r} km`, `Radius ${r} km`)}
+                        title={`Radius ${r} km`}
                         style={{ minHeight: '36px', minWidth: '44px' }}
                       >
                         {r} km
@@ -1874,7 +1907,7 @@ export default function DashboardPage() {
 
                 <div style={{ fontSize: '0.75rem', padding: '0.375rem 0.625rem', background: 'var(--bg-card-subtle)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--border-subtle)', color: 'var(--text-main)', display: 'flex', alignItems: 'center', gap: '6px' }}>
                   <span style={{ color: '#ea580c', display: 'inline-flex' }}><IconMapPin /></span>
-                  <span><strong>{tx('Active Point:', 'Titik Aktif:')}</strong> {customCandidate.name} ({customCandidate.lat.toFixed(4)}, {customCandidate.lng.toFixed(4)}) • <strong>{tx('Radius:', 'Radius:')}</strong> {customCandidate.radiusKm || 2} km</span>
+                  <span><strong>{tx('Active Point:', 'Titik Aktif:')}</strong> {customCandidate.name} ({Number(customCandidate.lat).toFixed(4)}, {Number(customCandidate.lng).toFixed(4)}) • <strong>{tx('Radius:', 'Radius:')}</strong> {customCandidate.radiusKm || 2} km</span>
                 </div>
               </div>
 
@@ -1898,7 +1931,9 @@ export default function DashboardPage() {
                     onClick={() => handleSaveAndScanCustomPoint(false)}
                     disabled={isSavingCustomPoint || !customCandidate.name.trim()}
                   >
-                    {tx('Save Without Scanning', 'Simpan Saja Tanpa Pindai')}
+                    {customCandidate.id
+                      ? tx('Save Changes', 'Simpan Perubahan')
+                      : tx('Save Without Scanning', 'Simpan Saja Tanpa Pindai')}
                   </button>
                   <button
                     type="button"
@@ -1910,12 +1945,16 @@ export default function DashboardPage() {
                     {isSavingCustomPoint ? (
                       <>
                         <span className="spinner" style={{ width: 16, height: 16, borderWidth: 2 }} />
-                        <span>{tx('Scanning...', 'Memproses Pemindaian...')}</span>
+                        <span>{tx('Processing...', 'Memproses...')}</span>
                       </>
                     ) : (
                       <>
                         <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="2"/><path d="M16.24 7.76a6 6 0 0 1 0 8.49m-8.48-.01a6 6 0 0 1 0-8.49m11.31-2.82a10 10 0 0 1 0 14.14m-14.14 0a10 10 0 0 1 0-14.14"/></svg>
-                        <span>{tx('Save & Scan Radius Now', 'Simpan & Pindai Radius Sekarang')}</span>
+                        <span>
+                          {customCandidate.id
+                            ? tx('Save & Re-scan Radius', 'Simpan & Pindai Ulang')
+                            : tx('Save & Scan Radius Now', 'Simpan & Pindai Radius Sekarang')}
+                        </span>
                       </>
                     )}
                   </button>

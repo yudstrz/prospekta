@@ -223,6 +223,7 @@ function MapView({
     radiusKm,
     places,
     isPickingMode,
+    customCandidate?.id,
     customCandidate?.lat,
     customCandidate?.lng,
     customCandidate?.radiusKm,
@@ -240,7 +241,9 @@ function MapView({
           {isPickingMode && (
             <span style={{ fontSize: '0.75rem', padding: '0.15rem 0.5rem', backgroundColor: '#fff7ed', color: '#ea580c', border: '1px solid #fdba74', borderRadius: 'var(--radius-sm)', fontWeight: 700, display: 'inline-flex', alignItems: 'center', gap: '0.25rem' }}>
               <span style={{ width: 6, height: 6, borderRadius: '50%', backgroundColor: '#ea580c', display: 'inline-block' }}></span>
-              {tx('New point mode on (click the map)', 'Mode Titik Baru Aktif (Klik Peta)')}
+              {customCandidate?.id
+                ? tx('Edit location mode (click/drag pin)', 'Mode Edit Lokasi (Klik/Geser Pin)')
+                : tx('New point mode on (click the map)', 'Mode Titik Baru Aktif (Klik Peta)')}
             </span>
           )}
         </div>

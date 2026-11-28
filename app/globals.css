@@ -2086,26 +2086,93 @@ tbody tr:hover {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 20px;
-  height: 20px;
+  width: 22px;
+  height: 22px;
   border-radius: 50%;
   background-color: transparent;
   color: var(--text-muted);
   font-size: 11px;
   font-weight: bold;
   border: 1px solid transparent;
-  margin-left: 4px;
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
-.btn-tab-delete:hover {
+.tab-chip {
+  display: inline-flex;
+  align-items: center;
+  min-height: 36px;
+  padding-right: 4px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-subtle);
+  background-color: var(--bg-card);
+  color: var(--text-muted);
+  transition: background-color 0.14s ease, border-color 0.14s ease, color 0.14s ease, box-shadow 0.14s ease;
+}
+
+.tab-chip:hover:not(.active) {
+  background-color: var(--bg-card-subtle);
+  color: var(--text-main);
+}
+
+.tab-chip.active {
+  background-color: var(--accent-light);
+  border-color: var(--primary);
+  color: var(--primary);
+  box-shadow: 0 0 0 1px var(--primary);
+}
+
+.tab-chip-main {
+  background: transparent;
+  border: none;
+  color: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  padding: 0 8px 0 12px;
+  min-height: 34px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-tab-action {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 50%;
+  background-color: transparent;
+  color: var(--text-muted);
+  border: 1px solid transparent;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.15s ease;
+}
+
+.btn-tab-action:hover:not(:disabled) {
+  background-color: var(--bg-card-subtle);
+  color: var(--text-main);
+  border-color: var(--border-subtle);
+}
+
+.btn-tab-action:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
+
+.btn-tab-action:focus-visible,
+.tab-chip-main:focus-visible {
+  outline: 2px solid var(--primary);
+  outline-offset: 1px;
+}
+
+.btn-tab-delete:hover:not(:disabled) {
   background-color: #fee2e2;
   color: #dc2626;
   border-color: #fca5a5;
 }
 
-[data-theme='dark'] .btn-tab-delete:hover {
+[data-theme='dark'] .btn-tab-delete:hover:not(:disabled) {
   background-color: #7f1d1d;
   color: #fecaca;
   border-color: #991b1b;
@@ -2467,6 +2534,17 @@ tbody tr:hover {
     min-height: 42px;
     padding: 0.5rem 0.875rem;
     font-size: 0.8125rem;
+  }
+  .tab-chip {
+    flex-shrink: 0;
+    min-height: 42px;
+  }
+  .tab-chip-main {
+    min-height: 40px;
+  }
+  .btn-tab-action {
+    width: 30px;
+    height: 30px;
   }
   .radius-pills {
     width: 100%;
